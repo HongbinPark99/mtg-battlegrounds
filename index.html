@@ -479,7 +479,7 @@ var REMOTE_DECK=null;
 var MY_DECK_CARDS=null;
 var myOffer='';
 var myAnswer='';
-var FB_URL='https://mtg-bg-default-rtdb.firebaseio.com';
+var FB_URL='https://mtg-battlegrounds-server.onrender.com';
 var myRoomKey=null;
 var roomPollTimer=null;
 var answerPollTimer=null;
@@ -503,7 +503,7 @@ function leaveMultiScreen(){
   clearInterval(roomPollTimer);clearInterval(answerPollTimer);
   // 내 방 지우기
   if(myRoomKey){
-    fetch(FB_URL+'/rooms/'+myRoomKey+'.json',{method:'DELETE'}).catch(function(){});
+    fetch(FB_URL+'/rooms/'+myRoomKey,{method:'DELETE'}).catch(function(){});
     myRoomKey=null;
   }
   showScreen('scMenu');
@@ -518,7 +518,7 @@ function goToMultiScreen(){
 
 // 방 목록 새로고침
 function refreshRooms(){
-  fetch(FB_URL+'/rooms.json').then(function(r){return r.json();}).then(function(data){
+  fetch(FB_URL+'/rooms').then(function(r){return r.json();}).then(function(data){
     var list=document.getElementById('roomList');
     if(!list)return;
     var rooms=[];
@@ -556,7 +556,7 @@ function hostRoom(){
   var nick=(document.getElementById('nickInput').value.trim()||'익명').substring(0,10);
   hostStatus('방 생성 중...','#888');
   // 기존 방 정리
-  if(myRoomKey){fetch(FB_URL+'/rooms/'+myRoomKey+'.json',{method:'DELETE'}).catch(function(){});myRoomKey=null;}
+  if(myRoomKey){fetch(FB_URL+'/rooms/'+myRoomKey,{method:'DELETE'}).catch(function(){});myRoomKey=null;}
   if(PEER){try{PEER.close();}catch(e){}PEER=null;}
 
   try{
@@ -567,10 +567,10 @@ function hostRoom(){
       if(e.candidate===null){
         myOffer=btoa(JSON.stringify(PEER.localDescription));
         // Firebase에 방 등록
-        fetch(FB_URL+'/rooms.json',{method:'POST',headers:{'Content-Type':'application/json'},
+        fetch(FB_URL+'/rooms',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({nick:nick,offer:myOffer,status:'waiting',created:Date.now()})
         }).then(function(r){return r.json();}).then(function(res){
-          myRoomKey=res.name;
+          myRoomKey=res.key;
           hostStatus('방 대기 중... 상대방을 기다립니다','#c9a227');
           refreshRooms();
           // answer 폴링 시작
@@ -585,14 +585,14 @@ function hostRoom(){
 
 // answer 수신 대기 (방장)
 function pollForAnswer(key){
-  fetch(FB_URL+'/rooms/'+key+'.json').then(function(r){return r.json();}).then(function(data){
+  fetch(FB_URL+'/rooms/'+key).then(function(r){return r.json();}).then(function(data){
     if(!data||!data.answer)return;
     clearInterval(answerPollTimer);
     try{
       var ans=JSON.parse(atob(data.answer));
       PEER.setRemoteDescription(ans).then(function(){
         // 방 상태 업데이트
-        fetch(FB_URL+'/rooms/'+key+'.json',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'playing'})});
+        fetch(FB_URL+'/rooms/'+key,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'playing'})});
         hostStatus('연결됨! 덱을 선택하세요','#27ae60');
       }).catch(function(e){hostStatus('연결 오류','#e74c3c');});
     }catch(e){hostStatus('데이터 오류','#e74c3c');}
@@ -602,7 +602,7 @@ function pollForAnswer(key){
 // 방 참가
 function joinRoom(roomKey,hostNick){
   multiMsg('연결 중...','#00bcd4');
-  fetch(FB_URL+'/rooms/'+roomKey+'.json').then(function(r){return r.json();}).then(function(data){
+  fetch(FB_URL+'/rooms/'+roomKey).then(function(r){return r.json();}).then(function(data){
     if(!data||!data.offer){multiMsg('방 정보를 불러올 수 없습니다','#e74c3c');return;}
     if(PEER){try{PEER.close();}catch(e){}PEER=null;}
     try{
@@ -613,7 +613,7 @@ function joinRoom(roomKey,hostNick){
         if(ev.candidate===null){
           myAnswer=btoa(JSON.stringify(PEER.localDescription));
           // Firebase에 answer 전송
-          fetch(FB_URL+'/rooms/'+roomKey+'.json',{method:'PATCH',headers:{'Content-Type':'application/json'},
+          fetch(FB_URL+'/rooms/'+roomKey,{method:'PATCH',headers:{'Content-Type':'application/json'},
             body:JSON.stringify({answer:myAnswer,status:'connecting'})
           }).then(function(){
             multiMsg(hostNick+'의 방에 연결 시도 중...','#00bcd4');
@@ -630,7 +630,7 @@ function joinRoom(roomKey,hostNick){
 function setupChannel(ch){
   ch.onopen=function(){
     clearInterval(roomPollTimer);clearInterval(answerPollTimer);
-    if(myRoomKey){fetch(FB_URL+'/rooms/'+myRoomKey+'.json',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'playing'})}).catch(function(){});}
+    if(myRoomKey){fetch(FB_URL+'/rooms/'+myRoomKey,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'playing'})}).catch(function(){});}
     gameMode='multi';
     goToDeck('multi');
   };
