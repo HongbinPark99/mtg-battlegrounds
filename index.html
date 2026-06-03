@@ -522,11 +522,10 @@ function refreshRooms(){
     var list=document.getElementById('roomList');
     if(!list)return;
     var rooms=[];
-    if(data){
-      Object.keys(data).forEach(function(k){
-        var r=data[k];
-        // 5분 넘은 방 제외
-        if(Date.now()-r.created<300000&&r.status==='waiting')rooms.push({key:k,data:r});
+    // 서버는 [{key, nick, created}] 배열로 반환
+    if(Array.isArray(data)){
+      data.forEach(function(r){
+        if(r&&Date.now()-r.created<300000)rooms.push({key:r.key,data:r});
       });
     }
     if(rooms.length===0){
