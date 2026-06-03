@@ -686,7 +686,11 @@ function remoteSlash(){
 }
 function applyRemoteState(msg){
   if(!G)return;
-  G.a.x=msg.x;G.a.y=msg.y;G.a.hp=msg.hp;G.a.mana=msg.mana;
+  // 상대방 x 좌표를 내 화면 기준으로 반전 (거울모드)
+  // host: 왼쪽 시작 → 상대(guest)는 오른쪽 → x 그대로
+  // guest: 오른쪽 시작 → 상대(host)는 왼쪽 → x 그대로
+  // 즉 둘 다 상대 x를 (innerWidth - x) 로 반전해야 내 화면에서 맞는 위치
+  G.a.x=innerWidth-msg.x;G.a.y=msg.y;G.a.hp=msg.hp;G.a.mana=msg.mana;
 }
 function startMultiGame(){
   if(!MY_DECK_CARDS||!REMOTE_DECK)return;
