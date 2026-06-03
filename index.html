@@ -95,7 +95,6 @@ canvas{position:fixed;top:0;left:0;}
   <div class="divider"></div>
   <button class="mbtn" onclick="goToDeck('solo')">AI 대전</button>
   <button class="mbtn" onclick="goToMulti()">온라인 멀티플레이</button>
-  <a href="https://raw.githubusercontent.com/HongbinPark99/mtg-battlegrounds/main/index.html" download="mtg-battlegrounds.html" style="padding:10px 32px;font-size:13px;font-weight:700;letter-spacing:2px;background:rgba(255,255,255,.06);color:#aaa;border:1px solid rgba(255,255,255,.12);border-radius:4px;cursor:pointer;font-family:Georgia,serif;text-transform:uppercase;margin:5px;text-decoration:none;display:inline-block;">⬇ 최신 버전 다운로드</a>
   <div class="ctrl-grid">
     <div><span class="kk">A W S D</span> 이동</div>
     <div><span class="kk">H J K L</span> 크리처 소환</div>
@@ -129,26 +128,28 @@ canvas{position:fixed;top:0;left:0;}
 <!-- MULTIPLAYER -->
 <div class="screen" id="scMulti">
   <div class="deck-title" style="color:#00bcd4;margin-bottom:4px;">온라인 멀티플레이</div>
-  <div class="deck-sub">WebRTC P2P - 서버 없이 직접 연결</div>
-  <div style="display:flex;gap:16px;margin-top:8px;">
-    <div class="multi-box">
-      <div class="multi-label">방장 - 방 만들기</div>
-      <div class="multi-code" id="myCode">----</div>
-      <div class="multi-label" style="margin-top:8px;">친구에게 이 코드를 알려주세요</div>
-      <button class="mbtn" onclick="hostRoom()" style="margin-top:8px;">방 만들기</button>
-      <div class="multi-status" id="hostStatus" style="color:#555;"></div>
+  <div class="deck-sub">방을 만들거나 목록에서 참가하세요</div>
+  <div style="display:flex;gap:16px;margin-top:10px;width:100%;max-width:820px;align-items:flex-start;">
+    <!-- 방 만들기 -->
+    <div class="multi-box" style="min-width:220px;flex-shrink:0;">
+      <div class="multi-label">내 닉네임</div>
+      <input class="multi-input" id="nickInput" placeholder="닉네임" maxlength="10" style="font-size:14px;letter-spacing:1px;">
+      <button class="mbtn" onclick="hostRoom()" style="margin-top:12px;width:100%;">방 만들기</button>
+      <div class="multi-status" id="hostStatus" style="color:#555;min-height:18px;margin-top:6px;"></div>
     </div>
-    <div class="multi-box">
-      <div class="multi-label">참가 - 방 코드 입력</div>
-      <input class="multi-input" id="joinCode" placeholder="XXXX" maxlength="4">
-      <button class="mbtn" onclick="joinRoom()" style="margin-top:10px;">참가하기</button>
-      <div class="multi-status" id="joinStatus" style="color:#555;"></div>
+    <!-- 방 목록 -->
+    <div class="multi-box" style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="multi-label" style="margin:0;">대기 중인 방</div>
+        <button onclick="refreshRooms()" style="background:none;border:1px solid #333;color:#555;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:10px;font-family:Georgia,serif;">새로고침</button>
+      </div>
+      <div id="roomList" style="min-height:120px;max-height:220px;overflow-y:auto;">
+        <div style="color:#333;font-size:11px;text-align:center;margin-top:30px;">불러오는 중...</div>
+      </div>
     </div>
   </div>
-  <button class="mbtn sec" onclick="showScreen('scMenu')" style="margin-top:14px;">뒤로</button>
-  <div style="margin-top:10px;font-size:10px;color:#333;text-align:center;">
-    연결 후 양쪽 모두 크리처를 선택하면 전투가 시작됩니다.
-  </div>
+  <button class="mbtn sec" onclick="leaveMultiScreen()" style="margin-top:14px;">뒤로</button>
+  <div id="multiMsg" style="margin-top:8px;font-size:11px;color:#555;text-align:center;min-height:18px;"></div>
 </div>
 
 <div id="hud">
@@ -360,7 +361,7 @@ function goToDeck(mode){
   buildDeckUI();
   showScreen('scDeck');
 }
-function goToMulti(){showScreen('scMulti');}
+function goToMulti(){goToMultiScreen();}
 
 // Individual card selection UI - each creature shown as a card, pick 4
 function buildDeckUI(){
@@ -471,38 +472,93 @@ function aiPickDeck(){
   return pick;
 }
 
-//  WEBRTC MULTIPLAYER 
+//  WEBRTC MULTIPLAYER (Firebase Signaling + Room List)
 var PEER=null,PEER_CONN=null,PEER_CHAN=null;
 var MY_CODE='';
 var REMOTE_DECK=null;
 var MY_DECK_CARDS=null;
+var myOffer='';
+var myAnswer='';
+var FB_URL='https://mtg-bg-default-rtdb.firebaseio.com';
+var myRoomKey=null;
+var roomPollTimer=null;
+var answerPollTimer=null;
+
+function multiMsg(msg,col){
+  var el=document.getElementById('multiMsg');
+  if(el){el.textContent=msg;el.style.color=col||'#555';}
+}
+function hostStatus(msg,col){
+  var el=document.getElementById('hostStatus');
+  if(el){el.textContent=msg;el.style.color=col||'#888';}
+}
 
 function genCode(){
   var chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   var c='';for(var i=0;i<4;i++)c+=chars[Math.floor(Math.random()*chars.length)];
   return c;
 }
-function hostStatus(msg,col){
-  var el=document.getElementById('hostStatus');
-  if(el){el.textContent=msg;el.style.color=col||'#888';}
+
+function leaveMultiScreen(){
+  clearInterval(roomPollTimer);clearInterval(answerPollTimer);
+  // 내 방 지우기
+  if(myRoomKey){
+    fetch(FB_URL+'/rooms/'+myRoomKey+'.json',{method:'DELETE'}).catch(function(){});
+    myRoomKey=null;
+  }
+  showScreen('scMenu');
 }
-function joinStatus(msg,col){
-  var el=document.getElementById('joinStatus');
-  if(el){el.textContent=msg;el.style.color=col||'#888';}
+
+function goToMultiScreen(){
+  showScreen('scMulti');
+  refreshRooms();
+  clearInterval(roomPollTimer);
+  roomPollTimer=setInterval(refreshRooms,4000);
 }
 
-// Minimal WebRTC using public STUN + manual signaling via shared code
-// We use a simple free signaling via json.glitch.me style - but since no server,
-// we use a creative approach: encode offer/answer in shareable text the user copies
-// For true P2P: show SDP offer as text, user sends to friend, friend pastes answer
+// 방 목록 새로고침
+function refreshRooms(){
+  fetch(FB_URL+'/rooms.json').then(function(r){return r.json();}).then(function(data){
+    var list=document.getElementById('roomList');
+    if(!list)return;
+    var rooms=[];
+    if(data){
+      Object.keys(data).forEach(function(k){
+        var r=data[k];
+        // 5분 넘은 방 제외
+        if(Date.now()-r.created<300000&&r.status==='waiting')rooms.push({key:k,data:r});
+      });
+    }
+    if(rooms.length===0){
+      list.innerHTML='<div style="color:#333;font-size:11px;text-align:center;margin-top:30px;">대기 중인 방이 없습니다</div>';
+      return;
+    }
+    list.innerHTML='';
+    rooms.forEach(function(room){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid rgba(255,255,255,0.07);border-radius:5px;margin-bottom:6px;background:rgba(255,255,255,0.02);';
+      var ago=Math.floor((Date.now()-room.data.created)/1000);
+      var agoStr=ago<60?ago+'초 전':Math.floor(ago/60)+'분 전';
+      row.innerHTML='<div><div style="color:#e8d5b7;font-size:12px;font-weight:700;">'+escHtml(room.data.nick||'익명')+'</div><div style="color:#444;font-size:10px;">'+agoStr+'</div></div>'
+        +'<button onclick="joinRoom(\''+room.key+'\',\''+escHtml(room.data.nick||'익명')+'\')" style="padding:5px 14px;background:linear-gradient(135deg,#00bcd4,#0097a7);color:#000;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;font-family:Georgia,serif;">참가</button>';
+      list.appendChild(row);
+    });
+  }).catch(function(){
+    var list=document.getElementById('roomList');
+    if(list)list.innerHTML='<div style="color:#e74c3c;font-size:11px;text-align:center;margin-top:30px;">서버 연결 실패</div>';
+  });
+}
 
-var myOffer='';
-var myAnswer='';
+function escHtml(s){return String(s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);});}
 
+// 방 만들기
 function hostRoom(){
-  MY_CODE=genCode();
-  document.getElementById('myCode').textContent=MY_CODE;
-  hostStatus('Creating connection...','#888');
+  var nick=(document.getElementById('nickInput').value.trim()||'익명').substring(0,10);
+  hostStatus('방 생성 중...','#888');
+  // 기존 방 정리
+  if(myRoomKey){fetch(FB_URL+'/rooms/'+myRoomKey+'.json',{method:'DELETE'}).catch(function(){});myRoomKey=null;}
+  if(PEER){try{PEER.close();}catch(e){}PEER=null;}
+
   try{
     PEER=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});
     PEER_CHAN=PEER.createDataChannel('game',{ordered:true});
@@ -510,111 +566,76 @@ function hostRoom(){
     PEER.onicecandidate=function(e){
       if(e.candidate===null){
         myOffer=btoa(JSON.stringify(PEER.localDescription));
-        hostStatus('Share code: '+MY_CODE+' - Connection ready!','#c9a227');
-        // store offer in sessionStorage keyed by code
-        try{sessionStorage.setItem('offer_'+MY_CODE,myOffer);}catch(ex){}
-        showOfferModal(myOffer);
+        // Firebase에 방 등록
+        fetch(FB_URL+'/rooms.json',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({nick:nick,offer:myOffer,status:'waiting',created:Date.now()})
+        }).then(function(r){return r.json();}).then(function(res){
+          myRoomKey=res.name;
+          hostStatus('방 대기 중... 상대방을 기다립니다','#c9a227');
+          refreshRooms();
+          // answer 폴링 시작
+          clearInterval(answerPollTimer);
+          answerPollTimer=setInterval(function(){pollForAnswer(myRoomKey);},2000);
+        }).catch(function(){hostStatus('서버 오류','#e74c3c');});
       }
     };
-    PEER.createOffer().then(function(offer){return PEER.setLocalDescription(offer);}).catch(function(e){hostStatus('Error: '+e.message,'#e74c3c');});
-  }catch(e){hostStatus('WebRTC not supported','#e74c3c');}
+    PEER.createOffer().then(function(offer){return PEER.setLocalDescription(offer);}).catch(function(e){hostStatus('오류: '+e.message,'#e74c3c');});
+  }catch(e){hostStatus('WebRTC 미지원','#e74c3c');}
 }
 
-function joinRoom(){
-  var code=document.getElementById('joinCode').value.toUpperCase().trim();
-  if(code.length!==4){joinStatus('Enter 4-char code','#e74c3c');return;}
-  joinStatus('Looking for host...','#888');
-  showJoinModal(code);
+// answer 수신 대기 (방장)
+function pollForAnswer(key){
+  fetch(FB_URL+'/rooms/'+key+'.json').then(function(r){return r.json();}).then(function(data){
+    if(!data||!data.answer)return;
+    clearInterval(answerPollTimer);
+    try{
+      var ans=JSON.parse(atob(data.answer));
+      PEER.setRemoteDescription(ans).then(function(){
+        // 방 상태 업데이트
+        fetch(FB_URL+'/rooms/'+key+'.json',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'playing'})});
+        hostStatus('연결됨! 덱을 선택하세요','#27ae60');
+      }).catch(function(e){hostStatus('연결 오류','#e74c3c');});
+    }catch(e){hostStatus('데이터 오류','#e74c3c');}
+  }).catch(function(){});
 }
 
-function showOfferModal(offerB64){
-  var txt='Send this to your friend:\n\nCODE: '+MY_CODE+'\nOFFER: '+offerB64.substring(0,40)+'...\n\n(Click OK then share the full offer from the text box below)';
-  var box=document.createElement('div');
-  box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-  box.innerHTML='<div style="color:#c9a227;font-size:14px;letter-spacing:2px;margin-bottom:12px;">SHARE WITH FRIEND</div>'
-    +'<textarea id="offerTxt" style="width:380px;height:80px;background:#111;color:#0f0;border:1px solid #333;padding:8px;font-family:monospace;font-size:10px;resize:none;" readonly>'+offerB64+'</textarea>'
-    +'<div style="color:#555;font-size:10px;margin:8px 0;">Friend pastes their Answer here:</div>'
-    +'<textarea id="answerTxt" style="width:380px;height:60px;background:#111;color:#0f0;border:1px solid #333;padding:8px;font-family:monospace;font-size:10px;resize:none;" placeholder="Paste answer from friend here..."></textarea>'
-    +'<div style="display:flex;gap:8px;margin-top:10px;">'
-    +'<button onclick="copyOffer()" style="padding:8px 20px;background:#c9a227;color:#000;border:none;border-radius:4px;cursor:pointer;font-family:Georgia,serif;">COPY OFFER</button>'
-    +'<button onclick="submitAnswer()" style="padding:8px 20px;background:#27ae60;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:Georgia,serif;">CONNECT</button>'
-    +'<button onclick="this.parentNode.parentNode.remove()" style="padding:8px 20px;background:rgba(255,255,255,0.1);color:#aaa;border:none;border-radius:4px;cursor:pointer;font-family:Georgia,serif;">CLOSE</button>'
-    +'</div>';
-  document.body.appendChild(box);
-}
-
-function copyOffer(){
-  var el=document.getElementById('offerTxt');
-  if(el){el.select();try{document.execCommand('copy');}catch(e){}
-  hostStatus('Offer copied! Share with friend.','#27ae60');}
-}
-
-function submitAnswer(){
-  var el=document.getElementById('answerTxt');
-  if(!el||!el.value.trim()){hostStatus('Paste friend answer first','#e74c3c');return;}
-  try{
-    var ans=JSON.parse(atob(el.value.trim()));
-    PEER.setRemoteDescription(ans).then(function(){
-      hostStatus('Connected! Choose deck to play.','#27ae60');
-      document.body.removeChild(el.closest('div[style]'));
-      gameMode='multi';
-      goToDeck('multi');
-    }).catch(function(e){hostStatus('Bad answer: '+e.message,'#e74c3c');});
-  }catch(e){hostStatus('Invalid data','#e74c3c');}
-}
-
-function showJoinModal(code){
-  var box=document.createElement('div');
-  box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-  box.innerHTML='<div style="color:#00bcd4;font-size:14px;letter-spacing:2px;margin-bottom:12px;">JOIN ROOM: '+code+'</div>'
-    +'<div style="color:#555;font-size:10px;margin-bottom:6px;">Paste Host\'s Offer here:</div>'
-    +'<textarea id="joinOfferTxt" style="width:380px;height:80px;background:#111;color:#0f0;border:1px solid #333;padding:8px;font-family:monospace;font-size:10px;resize:none;" placeholder="Paste host offer here..."></textarea>'
-    +'<div style="color:#555;font-size:10px;margin:8px 0;">Your Answer (send back to host):</div>'
-    +'<textarea id="joinAnswerOut" style="width:380px;height:60px;background:#111;color:#0f0;border:1px solid #333;padding:8px;font-family:monospace;font-size:10px;resize:none;" readonly placeholder="Answer appears here..."></textarea>'
-    +'<div style="display:flex;gap:8px;margin-top:10px;">'
-    +'<button onclick="genAnswer()" style="padding:8px 20px;background:#00bcd4;color:#000;border:none;border-radius:4px;cursor:pointer;font-family:Georgia,serif;">GENERATE ANSWER</button>'
-    +'<button onclick="copyAnswer()" style="padding:8px 20px;background:#c9a227;color:#000;border:none;border-radius:4px;cursor:pointer;font-family:Georgia,serif;">COPY ANSWER</button>'
-    +'<button onclick="this.parentNode.parentNode.remove()" style="padding:8px 20px;background:rgba(255,255,255,0.1);color:#aaa;border:none;border-radius:4px;cursor:pointer;font-family:Georgia,serif;">CLOSE</button>'
-    +'</div>'
-    +'<div id="joinConnStatus" style="color:#555;font-size:11px;margin-top:8px;"></div>';
-  document.body.appendChild(box);
-}
-
-function genAnswer(){
-  var offerTxt=document.getElementById('joinOfferTxt');
-  if(!offerTxt||!offerTxt.value.trim()){joinStatus('Paste host offer first','#e74c3c');return;}
-  try{
-    var offer=JSON.parse(atob(offerTxt.value.trim()));
-    PEER=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});
-    PEER.ondatachannel=function(e){PEER_CHAN=e.channel;setupChannel(PEER_CHAN);};
-    PEER.onicecandidate=function(ev){
-      if(ev.candidate===null){
-        myAnswer=btoa(JSON.stringify(PEER.localDescription));
-        var out=document.getElementById('joinAnswerOut');
-        if(out)out.value=myAnswer;
-        var st=document.getElementById('joinConnStatus');
-        if(st){st.textContent='Copy answer and send to host!';st.style.color='#c9a227';}
-        joinStatus('Answer generated! Send to host.','#c9a227');
-      }
-    };
-    PEER.setRemoteDescription(offer).then(function(){return PEER.createAnswer();}).then(function(ans){return PEER.setLocalDescription(ans);}).catch(function(e){joinStatus('Error: '+e.message,'#e74c3c');});
-  }catch(e){joinStatus('Invalid offer','#e74c3c');}
-}
-function copyAnswer(){
-  var el=document.getElementById('joinAnswerOut');
-  if(el){el.select();try{document.execCommand('copy');}catch(e){}joinStatus('Answer copied! Send to host.','#27ae60');}
+// 방 참가
+function joinRoom(roomKey,hostNick){
+  multiMsg('연결 중...','#00bcd4');
+  fetch(FB_URL+'/rooms/'+roomKey+'.json').then(function(r){return r.json();}).then(function(data){
+    if(!data||!data.offer){multiMsg('방 정보를 불러올 수 없습니다','#e74c3c');return;}
+    if(PEER){try{PEER.close();}catch(e){}PEER=null;}
+    try{
+      var offer=JSON.parse(atob(data.offer));
+      PEER=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});
+      PEER.ondatachannel=function(e){PEER_CHAN=e.channel;setupChannel(PEER_CHAN);};
+      PEER.onicecandidate=function(ev){
+        if(ev.candidate===null){
+          myAnswer=btoa(JSON.stringify(PEER.localDescription));
+          // Firebase에 answer 전송
+          fetch(FB_URL+'/rooms/'+roomKey+'.json',{method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({answer:myAnswer,status:'connecting'})
+          }).then(function(){
+            multiMsg(hostNick+'의 방에 연결 시도 중...','#00bcd4');
+          }).catch(function(){multiMsg('서버 오류','#e74c3c');});
+        }
+      };
+      PEER.setRemoteDescription(offer).then(function(){return PEER.createAnswer();})
+        .then(function(ans){return PEER.setLocalDescription(ans);})
+        .catch(function(e){multiMsg('오류: '+e.message,'#e74c3c');});
+    }catch(e){multiMsg('연결 실패','#e74c3c');}
+  }).catch(function(){multiMsg('서버 연결 실패','#e74c3c');});
 }
 
 function setupChannel(ch){
   ch.onopen=function(){
-    hostStatus('P2P Connected!','#27ae60');joinStatus('P2P Connected!','#27ae60');
+    clearInterval(roomPollTimer);clearInterval(answerPollTimer);
+    if(myRoomKey){fetch(FB_URL+'/rooms/'+myRoomKey+'.json',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'playing'})}).catch(function(){});}
     gameMode='multi';
-    // close any modals
-    document.querySelectorAll('div[style*="position:fixed"][style*="z-index:200"]').forEach(function(d){d.remove();});
     goToDeck('multi');
   };
   ch.onmessage=function(e){onPeerMsg(JSON.parse(e.data));};
-  ch.onerror=function(e){hostStatus('Channel error','#e74c3c');};
+  ch.onerror=function(e){multiMsg('채널 오류','#e74c3c');};
 }
 function peerSend(obj){
   if(PEER_CHAN&&PEER_CHAN.readyState==='open')PEER_CHAN.send(JSON.stringify(obj));
