@@ -458,9 +458,14 @@ function updateDeckConfirm(){
 
 function confirmDeck(){
   if(!selectedDeck||selectedDeck.cards.length!==4)return;
-  if(gameMode==='multi'&&PEER_CONN){
+  if(gameMode==='multi'){
+    MY_DECK_CARDS=selectedDeck.cards;
     peerSend({type:'deck',cards:selectedDeck.cards});
-    hostStatus('덱 전송 완료, 상대방 대기 중...');
+    // 대기 화면 표시
+    showScreen('scDeck');
+    var btn=document.getElementById('deckConfirm');
+    if(btn){btn.textContent='상대방 대기 중...';btn.style.opacity='0.5';btn.style.pointerEvents='none';}
+    if(REMOTE_DECK){startMultiGame();}
     return;
   }
   startGame(selectedDeck.cards, aiPickDeck());
@@ -643,8 +648,19 @@ function onPeerMsg(msg){
   if(msg.type==='deck'){
     REMOTE_DECK=msg.cards;
     if(MY_DECK_CARDS){startMultiGame();}
-  } else if(msg.type==='input'){
-    applyRemoteInput(msg);
+    else {
+      // 상대가 먼저 덱 보냄 - 내가 아직 선택 중
+      var btn=document.getElementById('deckConfirm');
+      if(btn&&btn.textContent!=='상대방 대기 중...'){
+        btn.textContent='상대방 준비완료! 시작하기';
+        btn.style.opacity='1';btn.style.pointerEvents='auto';
+      }
+    }
+  } else if(msg.type==='summon'){
+    // 상대가 소환 → 내 G.a에 추가
+    if(G)summon(G.a,msg.key);
+  } else if(msg.type==='slash'){
+    if(G)remoteSlash();
   } else if(msg.type==='state'){
     applyRemoteState(msg);
   }
@@ -940,7 +956,7 @@ function playerSlash(){
   var epx=G.a.x-px,epy=G.a.y-py;
   if(epx*epx+epy*epy<SLASH_RANGE*SLASH_RANGE){G.a.hp-=SLASH_DMG;spawnFx(G.a.x,G.a.y,'#ffe066',8,65);spawnDmg(G.a.x,G.a.y,'-'+SLASH_DMG,'p');G.shake=0.12;hitAny=true;}
   if(!hitAny)spawnFx(px+SLASH_DIR*30,py,'#ffe066',4,40);
-  if(gameMode==='multi')peerSend({type:'input',slash:true});
+  if(gameMode==='multi')peerSend({type:'slash'});
 }
 
 //  INPUT 
@@ -964,7 +980,7 @@ window.addEventListener('keyup',function(e){
 function summonAndSend(idx){
   var key=PLAYER_DECK[idx];if(!key)return;
   summon(G.p,key);
-  if(gameMode==='multi')peerSend({type:'input',summon:key});
+  if(gameMode==='multi')peerSend({type:'summon',key:key});
 }
 
 function moveP(dt){
@@ -976,7 +992,6 @@ function moveP(dt){
   if(dx||dy){var l=Math.sqrt(dx*dx+dy*dy);p.x+=dx/l*210*dt;p.y+=dy/l*210*dt;if(dx!==0)p.dir=dx>0?1:-1;}
   if(p.x<22)p.x=22;if(p.x>innerWidth-22)p.x=innerWidth-22;
   if(p.y<ATOP+22)p.y=ATOP+22;if(p.y>innerHeight-ABOT-22)p.y=innerHeight-ABOT-22;
-  if(gameMode==='multi')peerSend({type:'state',x:p.x,y:p.y,hp:p.hp,mana:p.mana});
 }
 
 //  PARTICLES 
@@ -1128,8 +1143,14 @@ function loop(ts){
   if(SLASH_ANIM>0)SLASH_ANIM-=dt;
   moveP(dt);
   G.p.mana+=MREGEN*dt;if(G.p.mana>G.p.mmana)G.p.mana=G.p.mmana;
-  G.a.mana+=MREGEN*dt;if(G.a.mana>G.a.mmana)G.a.mana=G.a.mmana;
-  aiTick(dt);updPressure(dt);updCrystals(dt);
+  if(gameMode==='multi'){
+    // 멀티: AI 없음, 매 프레임 내 상태 전송
+    peerSend({type:'state',x:G.p.x,y:G.p.y,hp:G.p.hp,mana:G.p.mana});
+  } else {
+    G.a.mana+=MREGEN*dt;if(G.a.mana>G.a.mmana)G.a.mana=G.a.mmana;
+    aiTick(dt);
+  }
+  updPressure(dt);updCrystals(dt);
   var i=0;while(i<G.p.cs.length){try{updCreature(G.p.cs[i],dt);}catch(e){}i++;}
   i=0;while(i<G.a.cs.length){try{updCreature(G.a.cs[i],dt);}catch(e){}i++;}
   var np=[],na=[];
