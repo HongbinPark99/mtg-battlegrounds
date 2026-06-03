@@ -98,7 +98,8 @@ canvas{position:fixed;top:0;left:0;}
   <div class="ctrl-grid">
     <div><span class="kk">A W S D</span> 이동</div>
     <div><span class="kk">H J K L</span> 크리처 소환</div>
-    <div><span class="kk">SPACE</span> 칼 휘두르기 (1피해, 3초 쿨타임)</div>
+    <div><span class="kk">SPACE</span> 칼 휘두르기 (1피해)</div>
+    <div><span class="kk">Q</span> 특수 스킬 (12초 쿨타임)</div>
     <div><span class="kk">중앙선 침범</span> 1초 후 지속 피해</div>
   </div>
   <div class="trait-box">
@@ -659,10 +660,10 @@ function onPeerMsg(msg){
       }
     }
   } else if(msg.type==='input'){
-    // guest 입력을 host가 받아서 처리
     if(multiRole==='host'&&G){
       if(msg.summon){summon(G.a,msg.summon);}
       if(msg.slash){remoteSlash();}
+      if(msg.skill){remoteSkill();}
       if(msg.x!==undefined){G.a.x=msg.x;G.a.y=msg.y;}
     }
   } else if(msg.type==='fullstate'){
@@ -673,7 +674,6 @@ function onPeerMsg(msg){
 
 function remoteSlash(){
   if(!G)return;
-  // G.a가 슬래시 → G.p 크리처와 G.p 플레이어에 데미지
   var ax=G.a.x,ay=G.a.y;
   for(var i=0;i<G.p.cs.length;i++){
     var c=G.p.cs[i];if(!c.alive)continue;
@@ -682,6 +682,26 @@ function remoteSlash(){
   }
   var px=G.p.x-ax,py=G.p.y-ay;
   if(px*px+py*py<SLASH_RANGE*SLASH_RANGE){G.p.hp-=SLASH_DMG;spawnFx(G.p.x,G.p.y,'#ffe066',8,65);G.shake=0.12;}
+}
+function remoteSkill(){
+  if(!G)return;
+  // guest(G.a 기준)의 스킬: AI_DECK 기반
+  var hasAtk=AI_DECK.some(function(k){return k==='dragon'||k==='berserker';});
+  var hasHeal=AI_DECK.some(function(k){return k==='angel'||k==='goblin';});
+  if(hasAtk){
+    for(var i=0;i<G.p.cs.length;i++){if(!G.p.cs[i].alive)continue;G.p.cs[i].hp-=2;spawnFx(G.p.cs[i].x,G.p.cs[i].y,'#ffe066',8,80);}
+    G.p.hp-=1;spawnFx(G.p.x,G.p.y,'#ffe066',12,100);G.shake=0.25;
+  } else if(hasHeal){
+    G.a.hp=Math.min(G.a.hp+5,G.a.mhp);spawnFx(G.a.x,G.a.y,'#27ae60',15,80);
+  } else {
+    var pr=120;
+    for(var j=0;j<G.p.cs.length;j++){
+      if(!G.p.cs[j].alive)continue;
+      var dx=G.p.cs[j].x-G.a.x,dy=G.p.cs[j].y-G.a.y;
+      if(dx*dx+dy*dy<pr*pr){G.p.cs[j].hp-=2;spawnFx(G.p.cs[j].x,G.p.cs[j].y,'#e74c3c',8,70);}
+    }
+    spawnFx(G.a.x,G.a.y,'#e74c3c',20,130);G.shake=0.3;
+  }
 }
 
 function applyFullState(msg){
@@ -695,19 +715,21 @@ function applyFullState(msg){
 }
 
 function makeCreatureFromData(c,own){
-  var d=ALL_DEFS[c.key];if(!d)return null;
-  return {key:c.key,d:d,x:c.x,y:c.y,spx:c.x,spy:c.y,hp:c.hp,mhp:d.hp,pow:d.pow,
-    trait:d.trait,shieldUp:c.shieldUp,t:c.t||0,sp:0,st:c.st||'walk',at:0,hd:false,
-    alive:c.hp>0,own:own,dir:own==='p'?-1:1,ttype:'',tobj:null,idt:0,pendingDmg:0};
+  // c = [key, x, y, hp, shieldUp, isAtk]
+  var d=ALL_DEFS[c[0]];if(!d)return null;
+  return {key:c[0],d:d,x:c[1],y:c[2],spx:c[1],spy:c[2],hp:c[3],mhp:d.hp,pow:d.pow,
+    trait:d.trait,shieldUp:c[4]===1,t:0,sp:0,st:c[5]===1?'atk':'walk',at:0,hd:false,
+    alive:c[3]>0,own:own,dir:own==='p'?-1:1,ttype:'',tobj:null,idt:0,pendingDmg:0};
 }
 
 function buildFullStateMsg(){
+  function cmap(c){return[c.key,Math.round(c.x),Math.round(c.y),Math.round(c.hp*10)/10,c.shieldUp?1:0,c.st==='atk'?1:0];}
   return {
     type:'fullstate',
-    px:G.p.x,pay:G.p.y,php:G.p.hp,pmana:G.p.mana,
-    ax:G.a.x,ay:G.a.y,ahp:G.a.hp,amana:G.a.mana,
-    pcs:G.p.cs.filter(function(c){return c.alive;}).map(function(c){return{key:c.key,x:c.x,y:c.y,hp:c.hp,shieldUp:c.shieldUp,st:c.st,t:c.t};}),
-    acs:G.a.cs.filter(function(c){return c.alive;}).map(function(c){return{key:c.key,x:c.x,y:c.y,hp:c.hp,shieldUp:c.shieldUp,st:c.st,t:c.t};})
+    px:Math.round(G.p.x),pay:Math.round(G.p.y),php:Math.round(G.p.hp*10)/10,pmana:Math.round(G.p.mana*10)/10,
+    ax:Math.round(G.a.x),ay:Math.round(G.a.y),ahp:Math.round(G.a.hp*10)/10,amana:Math.round(G.a.mana*10)/10,
+    pcs:G.p.cs.filter(function(c){return c.alive;}).map(cmap),
+    acs:G.a.cs.filter(function(c){return c.alive;}).map(cmap)
   };
 }
 
@@ -748,9 +770,9 @@ function startGame(pCards,aCards){
   var px=isGuest?W-90:90,   pd=isGuest?-1:1;
   var ax=isGuest?90:W-90,   ad=isGuest?1:-1;
   G={
-    p:{isP:true, x:px,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:pd},
-    a:{isP:false,x:ax,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:ad},
-    aiT:1.8,parts:[],dmgs:[],shake:0,crystals:[],cTimer:8
+    p:{isP:true, x:px,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:pd,kills:0,lv:1,skillCD:0},
+    a:{isP:false,x:ax,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:ad,kills:0,lv:1,skillCD:0},
+    aiT:1.8,parts:[],dmgs:[],shake:0,crystals:[],cTimer:8,bossCrystal:null,bossCTimer:20
   };
   buildCardBar(PLAYER_DECK);
   spawnCrystal(false,0,0);spawnCrystal(false,0,0);
@@ -984,6 +1006,124 @@ function updCrystals(dt){
   G.crystals=nc;
 }
 
+//  LEVEL UP 
+var LV_KILLS=[3,6,10,15]; // 레벨업 필요 킬수
+function checkLevelUp(owner){
+  var needed=LV_KILLS[owner.lv-1]||999;
+  if(owner.kills>=needed&&owner.lv<5){
+    owner.lv++;owner.kills=0;
+    var bonus=owner.isP?'레벨 '+owner.lv+'!':'';
+    if(bonus)showMsg('⬆ '+bonus+' (속도·공격력 UP!)');
+    spawnFx(owner.x,owner.y,'#ffe066',20,100);
+    G.shake=0.2;
+  }
+}
+function getLvBonus(owner){
+  var lv=owner.lv||1;
+  return {spd:1+(lv-1)*0.15, pow:lv-1}; // 레벨당 속도15%, 공격력+1
+}
+
+//  BOSS CRYSTAL 
+function updBossCrystal(dt){
+  G.bossCTimer-=dt;
+  if(G.bossCTimer<=0&&!G.bossCrystal){
+    // 맵 중앙에 보스 크리스탈 등장
+    G.bossCrystal={x:innerWidth/2,y:ATOP+AH()*0.5,life:15,t:0,val:3};
+    G.bossCTimer=30+Math.random()*20;
+    showMsg('💎 파워 크리스탈 등장!');
+  }
+  if(!G.bossCrystal)return;
+  G.bossCrystal.t+=dt;
+  G.bossCrystal.life-=dt;
+  if(G.bossCrystal.life<=0){G.bossCrystal=null;return;}
+  var bc=G.bossCrystal;
+  // 플레이어가 먹으면 → 마나 3 + 즉시 최강 크리처 소환
+  var dpx=G.p.x-bc.x,dpy=G.p.y-bc.y;
+  if(dpx*dpx+dpy*dpy<30*30){
+    G.p.mana=Math.min(G.p.mana+bc.val,G.p.mmana);
+    spawnFx(bc.x,bc.y,'#ff6f00',25,120);
+    showMsg('💎 파워 크리스탈 획득! 마나 +'+bc.val);
+    // 강력한 크리처 즉시 소환
+    var powerCards=['dragon','angel','berserker'];
+    for(var pi=0;pi<powerCards.length;pi++){
+      if(PLAYER_DECK.indexOf(powerCards[pi])>=0){summon(G.p,powerCards[pi]);break;}
+    }
+    G.bossCrystal=null;G.shake=0.3;
+    return;
+  }
+  // AI도 먹기 가능
+  var dax=G.a.x-bc.x,day=G.a.y-bc.y;
+  if(dax*dax+day*day<30*30){
+    G.a.mana=Math.min(G.a.mana+bc.val,G.a.mmana);
+    spawnFx(bc.x,bc.y,'#ff6f00',25,120);
+    var pCards2=['dragon','angel','berserker'];
+    for(var ai2=0;ai2<pCards2.length;ai2++){
+      if(AI_DECK.indexOf(pCards2[ai2])>=0){summon(G.a,pCards2[ai2]);break;}
+    }
+    G.bossCrystal=null;
+    return;
+  }
+}
+function drawBossCrystal(){
+  if(!G.bossCrystal)return;
+  var bc=G.bossCrystal;
+  var pulse=Math.sin(bc.t*4)*0.3+0.7;
+  var fade=Math.min(1,bc.life/3);
+  CX.save();CX.globalAlpha=fade*pulse;
+  CX.shadowBlur=20;CX.shadowColor='#ff6f00';
+  CX.fillStyle='#ff6f00';
+  CX.beginPath();
+  var r=18;
+  for(var a=0;a<6;a++){
+    var ang=a*Math.PI/3-Math.PI/6;
+    var mx=bc.x+Math.cos(ang)*r,my=bc.y+Math.sin(ang)*r;
+    a===0?CX.moveTo(mx,my):CX.lineTo(mx,my);
+  }
+  CX.closePath();CX.fill();
+  CX.globalAlpha=fade;CX.fillStyle='#fff';CX.font='bold 11px Georgia';
+  CX.textAlign='center';CX.textBaseline='middle';
+  CX.fillText('💎',bc.x,bc.y);
+  CX.globalAlpha=1;CX.shadowBlur=0;CX.restore();
+}
+
+//  SKILL (Q키) 
+var SKILL_MAX_CD=12;
+function playerSkill(){
+  if(!G||G.p.skillCD>0)return;
+  G.p.skillCD=SKILL_MAX_CD;
+  // 덱에 따라 다른 스킬
+  var hasAtk=PLAYER_DECK.some(function(k){return k==='dragon'||k==='berserker';});
+  var hasHeal=PLAYER_DECK.some(function(k){return k==='angel'||k==='goblin';});
+  if(hasAtk){
+    // 번개 폭격: 상대 크리처 전체에 2데미지
+    for(var i=0;i<G.a.cs.length;i++){
+      if(!G.a.cs[i].alive)continue;
+      G.a.cs[i].hp-=2;
+      spawnFx(G.a.cs[i].x,G.a.cs[i].y,'#ffe066',10,80);
+      spawnDmg(G.a.cs[i].x,G.a.cs[i].y,'-2','p');
+    }
+    G.a.hp-=1;spawnFx(G.a.x,G.a.y,'#ffe066',15,100);
+    showMsg('⚡ 번개 폭격!');G.shake=0.25;
+  } else if(hasHeal){
+    // 신성한 치유: 체력 5 회복
+    G.p.hp=Math.min(G.p.hp+5,G.p.mhp);
+    spawnFx(G.p.x,G.p.y,'#27ae60',20,80);
+    spawnDmg(G.p.x,G.p.y,'+5','p');
+    showMsg('💚 신성한 치유!');
+  } else {
+    // 광역 폭발: 주변 전체 2데미지
+    var pr=120;
+    for(var j=0;j<G.a.cs.length;j++){
+      if(!G.a.cs[j].alive)continue;
+      var dx=G.a.cs[j].x-G.p.x,dy=G.a.cs[j].y-G.p.y;
+      if(dx*dx+dy*dy<pr*pr){G.a.cs[j].hp-=2;spawnFx(G.a.cs[j].x,G.a.cs[j].y,'#e74c3c',8,70);}
+    }
+    spawnFx(G.p.x,G.p.y,'#e74c3c',25,150);
+    showMsg('💥 광역 폭발!');G.shake=0.3;
+  }
+  if(gameMode==='multi'&&multiRole==='guest')peerSend({type:'input',skill:true});
+}
+
 //  SLASH 
 function playerSlash(){
   if(SLASH_CD>0)return;
@@ -1014,6 +1154,7 @@ window.addEventListener('keydown',function(e){
   else if(kl==='k')summonAndSend(2);
   else if(kl==='l')summonAndSend(3);
   else if(k===' '){e.preventDefault();playerSlash();}
+  else if(kl==='q'){e.preventDefault();playerSkill();}
 });
 window.addEventListener('keyup',function(e){
   KEYS[e.key]=false;
@@ -1193,16 +1334,16 @@ function loop(ts){
   G.p.mana+=MREGEN*dt;if(G.p.mana>G.p.mmana)G.p.mana=G.p.mmana;
   if(gameMode==='multi'){
     if(multiRole==='host'){
-      // host: 게임 전체 시뮬레이션, guest에게 전체 상태 전송
       G.a.mana+=MREGEN*dt;if(G.a.mana>G.a.mmana)G.a.mana=G.a.mmana;
+      // fullstate: 100ms마다 (10fps 전송, 렌더링은 60fps 유지)
       if(!G._stT)G._stT=0; G._stT+=dt;
-      if(G._stT>0.05){G._stT=0;peerSend(buildFullStateMsg());}
+      if(G._stT>0.1){G._stT=0;peerSend(buildFullStateMsg());}
     } else {
-      // guest: 시뮬레이션 없음, 위치 입력만 전송하고 렌더링
-      peerSend({type:'input',x:G.p.x,y:G.p.y});
-      // 크리처 애니메이션 타이머만 진행
+      // guest: 위치 100ms마다만 전송
+      if(!G._inT)G._inT=0; G._inT+=dt;
+      if(G._inT>0.1){G._inT=0;peerSend({type:'input',x:G.p.x,y:G.p.y});}
       for(var gi=0;gi<G.p.cs.length;gi++){if(G.p.cs[gi].alive){G.p.cs[gi].t+=dt;G.p.cs[gi].sp+=dt;}}
-      for(var gi=0;gi<G.a.cs.length;gi++){if(G.a.cs[gi].alive){G.a.cs[gi].t+=dt;G.a.cs[gi].sp+=dt;}}
+      for(var gi2=0;gi2<G.a.cs.length;gi2++){if(G.a.cs[gi2].alive){G.a.cs[gi2].t+=dt;G.a.cs[gi2].sp+=dt;}}
     }
   } else {
     G.a.mana+=MREGEN*dt;if(G.a.mana>G.a.mmana)G.a.mana=G.a.mmana;
@@ -1214,9 +1355,24 @@ function loop(ts){
     var i=0;while(i<G.p.cs.length){try{updCreature(G.p.cs[i],dt);}catch(e){}i++;}
     i=0;while(i<G.a.cs.length){try{updCreature(G.a.cs[i],dt);}catch(e){}i++;}
     var np=[],na=[];
-    for(i=0;i<G.p.cs.length;i++){var cc=G.p.cs[i];if(cc.hp<=0){cc.alive=false;spawnCrystal(true,cc.x,cc.y);}if(cc.alive)np.push(cc);}
-    for(i=0;i<G.a.cs.length;i++){var ca=G.a.cs[i];if(ca.hp<=0){ca.alive=false;spawnCrystal(true,ca.x,ca.y);}if(ca.alive)na.push(ca);}
+    for(i=0;i<G.p.cs.length;i++){
+      var cc=G.p.cs[i];
+      if(cc.hp<=0){cc.alive=false;spawnCrystal(true,cc.x,cc.y);
+        // 적 크리처 처치 → G.a가 킬 획득
+        G.a.kills++;checkLevelUp(G.a);
+      }if(cc.alive)np.push(cc);
+    }
+    for(i=0;i<G.a.cs.length;i++){
+      var ca=G.a.cs[i];
+      if(ca.hp<=0){ca.alive=false;spawnCrystal(true,ca.x,ca.y);
+        G.p.kills++;checkLevelUp(G.p);
+      }if(ca.alive)na.push(ca);
+    }
     G.p.cs=np;G.a.cs=na;
+    // 보스 크리스탈
+    if(G.p.skillCD>0)G.p.skillCD-=dt;
+    if(G.a.skillCD>0)G.a.skillCD-=dt;
+    updBossCrystal(dt);
   }
   var npt=[];for(i=0;i<G.parts.length;i++){var pp=G.parts[i];pp.x+=pp.vx*dt;pp.y+=pp.vy*dt;pp.vy+=50*dt;pp.life-=dt;if(pp.life>0)npt.push(pp);}G.parts=npt;
   var nd=[];for(i=0;i<G.dmgs.length;i++){var dd=G.dmgs[i];dd.y+=dd.vy*dt;dd.life-=dt;if(dd.life>0)nd.push(dd);}G.dmgs=nd;
@@ -1228,6 +1384,7 @@ function loop(ts){
   drawBG();
   for(i=0;i<G.parts.length;i++){var pp2=G.parts[i];var al=C01(pp2.life/pp2.ml);CX.globalAlpha=al;CX.fillStyle=pp2.col;CX.beginPath();CX.arc(pp2.x,pp2.y,pp2.r*al,0,P2);CX.fill();}CX.globalAlpha=1;
   for(i=0;i<G.crystals.length;i++)drawCrystal(G.crystals[i]);
+  drawBossCrystal();
   for(i=0;i<G.p.cs.length;i++)drawCreature(G.p.cs[i]);
   for(i=0;i<G.a.cs.length;i++)drawCreature(G.a.cs[i]);
   drawOwner(G.p);drawOwner(G.a);
