@@ -651,30 +651,29 @@ function onPeerMsg(msg){
   if(msg.type==='deck'){
     REMOTE_DECK=msg.cards;
     if(MY_DECK_CARDS){startMultiGame();}
-    else {
-      // 상대가 먼저 덱 보냄 - 내가 아직 선택 중
+    else{
       var btn=document.getElementById('deckConfirm');
       if(btn&&btn.textContent!=='상대방 대기 중...'){
         btn.textContent='상대방 준비완료! 시작하기';
         btn.style.opacity='1';btn.style.pointerEvents='auto';
       }
     }
-  } else if(msg.type==='summon'){
-    // 상대가 소환 → 내 G.a에 추가
-    if(G)summon(G.a,msg.key);
-  } else if(msg.type==='slash'){
-    if(G)remoteSlash();
-  } else if(msg.type==='state'){
-    applyRemoteState(msg);
+  } else if(msg.type==='input'){
+    // guest 입력을 host가 받아서 처리
+    if(multiRole==='host'&&G){
+      if(msg.summon){summon(G.a,msg.summon);}
+      if(msg.slash){remoteSlash();}
+      if(msg.x!==undefined){G.a.x=msg.x;G.a.y=msg.y;}
+    }
+  } else if(msg.type==='fullstate'){
+    // host가 보낸 전체 상태를 guest가 받아서 화면에 표시
+    if(multiRole==='guest'&&G){applyFullState(msg);}
   }
 }
-function applyRemoteInput(msg){
-  if(!G)return;
-  if(msg.summon){summon(G.a,msg.summon);}
-  if(msg.slash){remoteSlash();}
-}
+
 function remoteSlash(){
   if(!G)return;
+  // G.a가 슬래시 → G.p 크리처와 G.p 플레이어에 데미지
   var ax=G.a.x,ay=G.a.y;
   for(var i=0;i<G.p.cs.length;i++){
     var c=G.p.cs[i];if(!c.alive)continue;
@@ -684,16 +683,38 @@ function remoteSlash(){
   var px=G.p.x-ax,py=G.p.y-ay;
   if(px*px+py*py<SLASH_RANGE*SLASH_RANGE){G.p.hp-=SLASH_DMG;spawnFx(G.p.x,G.p.y,'#ffe066',8,65);G.shake=0.12;}
 }
-function applyRemoteState(msg){
-  if(!G)return;
-  // 상대방 x 좌표를 내 화면 기준으로 반전 (거울모드)
-  // host: 왼쪽 시작 → 상대(guest)는 오른쪽 → x 그대로
-  // guest: 오른쪽 시작 → 상대(host)는 왼쪽 → x 그대로
-  // 즉 둘 다 상대 x를 (innerWidth - x) 로 반전해야 내 화면에서 맞는 위치
-  G.a.x=innerWidth-msg.x;G.a.y=msg.y;G.a.hp=msg.hp;G.a.mana=msg.mana;
+
+function applyFullState(msg){
+  // guest: host가 보낸 전체 상태 적용 (p↔a 뒤집어서 적용)
+  // host의 G.p(왼쪽)=guest화면의 G.a, host의 G.a(오른쪽)=guest화면의 G.p
+  G.p.x=msg.ax;G.p.y=msg.ay;G.p.hp=msg.ahp;G.p.mana=msg.amana;
+  G.a.x=msg.px;G.a.y=msg.pay;G.a.hp=msg.php;G.a.mana=msg.pmana;
+  G.p.cs=msg.acs.map(function(c){return makeCreatureFromData(c,'p');}).filter(Boolean);
+  G.a.cs=msg.pcs.map(function(c){return makeCreatureFromData(c,'a');}).filter(Boolean);
+  if(RUN){if(G.p.hp<=0)gameOver('a');else if(G.a.hp<=0)gameOver('p');}
 }
+
+function makeCreatureFromData(c,own){
+  var d=ALL_DEFS[c.key];if(!d)return null;
+  return {key:c.key,d:d,x:c.x,y:c.y,spx:c.x,spy:c.y,hp:c.hp,mhp:d.hp,pow:d.pow,
+    trait:d.trait,shieldUp:c.shieldUp,t:c.t||0,sp:0,st:c.st||'walk',at:0,hd:false,
+    alive:c.hp>0,own:own,dir:own==='p'?-1:1,ttype:'',tobj:null,idt:0,pendingDmg:0};
+}
+
+function buildFullStateMsg(){
+  return {
+    type:'fullstate',
+    px:G.p.x,pay:G.p.y,php:G.p.hp,pmana:G.p.mana,
+    ax:G.a.x,ay:G.a.y,ahp:G.a.hp,amana:G.a.mana,
+    pcs:G.p.cs.filter(function(c){return c.alive;}).map(function(c){return{key:c.key,x:c.x,y:c.y,hp:c.hp,shieldUp:c.shieldUp,st:c.st,t:c.t};}),
+    acs:G.a.cs.filter(function(c){return c.alive;}).map(function(c){return{key:c.key,x:c.x,y:c.y,hp:c.hp,shieldUp:c.shieldUp,st:c.st,t:c.t};})
+  };
+}
+
 function startMultiGame(){
   if(!MY_DECK_CARDS||!REMOTE_DECK)return;
+  // host: G.p=나(왼쪽), G.a=상대(오른쪽)
+  // guest: G.p=나(오른쪽), G.a=상대(왼쪽) → startGame에서 설정
   startGame(MY_DECK_CARDS,REMOTE_DECK);
 }
 
@@ -718,10 +739,14 @@ function startGame(pCards,aCards){
   document.getElementById('gover').style.display='none';
   RUN=true;GT=0;KEYS={};LT=0;SLASH_CD=0;SLASH_ANIM=0;
   var my=ATOP+AH()*0.5;
-  // 멀티: host=왼쪽(dir:1), guest=오른쪽(dir:-1) 거울모드
+  // 멀티: host=항상 왼쪽(G.p), guest=항상 오른쪽(G.p)
+  // 양쪽 모두 G.p가 자신, G.a가 상대
+  // host: G.p 왼쪽(x=90,dir=1), G.a 오른쪽(x=W-90,dir=-1)
+  // guest: G.p 오른쪽(x=W-90,dir=-1), G.a 왼쪽(x=90,dir=1)
   var isGuest=(gameMode==='multi'&&multiRole==='guest');
-  var px=isGuest?innerWidth-90:90, pd=isGuest?-1:1;
-  var ax=isGuest?90:innerWidth-90, ad=isGuest?1:-1;
+  var W=innerWidth;
+  var px=isGuest?W-90:90,   pd=isGuest?-1:1;
+  var ax=isGuest?90:W-90,   ad=isGuest?1:-1;
   G={
     p:{isP:true, x:px,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:pd},
     a:{isP:false,x:ax,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:ad},
@@ -972,7 +997,9 @@ function playerSlash(){
   var epx=G.a.x-px,epy=G.a.y-py;
   if(epx*epx+epy*epy<SLASH_RANGE*SLASH_RANGE){G.a.hp-=SLASH_DMG;spawnFx(G.a.x,G.a.y,'#ffe066',8,65);spawnDmg(G.a.x,G.a.y,'-'+SLASH_DMG,'p');G.shake=0.12;hitAny=true;}
   if(!hitAny)spawnFx(px+SLASH_DIR*30,py,'#ffe066',4,40);
-  if(gameMode==='multi')peerSend({type:'slash'});
+  if(gameMode==='multi'){
+    if(multiRole==='guest'){peerSend({type:'input',slash:true});}
+  }
 }
 
 //  INPUT 
@@ -995,8 +1022,13 @@ window.addEventListener('keyup',function(e){
 
 function summonAndSend(idx){
   var key=PLAYER_DECK[idx];if(!key)return;
-  summon(G.p,key);
-  if(gameMode==='multi')peerSend({type:'summon',key:key});
+  if(gameMode==='multi'&&multiRole==='guest'){
+    // guest는 host에게 소환 요청만
+    peerSend({type:'input',summon:key});
+  } else {
+    summon(G.p,key);
+    if(gameMode==='multi')peerSend({type:'input',summon:key});
+  }
 }
 
 function moveP(dt){
@@ -1160,20 +1192,32 @@ function loop(ts){
   moveP(dt);
   G.p.mana+=MREGEN*dt;if(G.p.mana>G.p.mmana)G.p.mana=G.p.mmana;
   if(gameMode==='multi'){
-    // 멀티: AI 없음, 매 프레임 내 상태 전송 (guest는 x좌표 반전해서 전송)
-    var sendX=G.p.x;
-    peerSend({type:'state',x:sendX,y:G.p.y,hp:G.p.hp,mana:G.p.mana});
+    if(multiRole==='host'){
+      // host: 게임 전체 시뮬레이션, guest에게 전체 상태 전송
+      G.a.mana+=MREGEN*dt;if(G.a.mana>G.a.mmana)G.a.mana=G.a.mmana;
+      if(!G._stT)G._stT=0; G._stT+=dt;
+      if(G._stT>0.05){G._stT=0;peerSend(buildFullStateMsg());}
+    } else {
+      // guest: 시뮬레이션 없음, 위치 입력만 전송하고 렌더링
+      peerSend({type:'input',x:G.p.x,y:G.p.y});
+      // 크리처 애니메이션 타이머만 진행
+      for(var gi=0;gi<G.p.cs.length;gi++){if(G.p.cs[gi].alive){G.p.cs[gi].t+=dt;G.p.cs[gi].sp+=dt;}}
+      for(var gi=0;gi<G.a.cs.length;gi++){if(G.a.cs[gi].alive){G.a.cs[gi].t+=dt;G.a.cs[gi].sp+=dt;}}
+    }
   } else {
     G.a.mana+=MREGEN*dt;if(G.a.mana>G.a.mmana)G.a.mana=G.a.mmana;
     aiTick(dt);
   }
   updPressure(dt);updCrystals(dt);
-  var i=0;while(i<G.p.cs.length){try{updCreature(G.p.cs[i],dt);}catch(e){}i++;}
-  i=0;while(i<G.a.cs.length){try{updCreature(G.a.cs[i],dt);}catch(e){}i++;}
-  var np=[],na=[];
-  for(i=0;i<G.p.cs.length;i++){var cc=G.p.cs[i];if(cc.hp<=0){cc.alive=false;spawnCrystal(true,cc.x,cc.y);}if(cc.alive)np.push(cc);}
-  for(i=0;i<G.a.cs.length;i++){var ca=G.a.cs[i];if(ca.hp<=0){ca.alive=false;spawnCrystal(true,ca.x,ca.y);}if(ca.alive)na.push(ca);}
-  G.p.cs=np;G.a.cs=na;
+  // guest는 시뮬레이션 없이 렌더링만
+  if(gameMode!=='multi'||multiRole==='host'){
+    var i=0;while(i<G.p.cs.length){try{updCreature(G.p.cs[i],dt);}catch(e){}i++;}
+    i=0;while(i<G.a.cs.length){try{updCreature(G.a.cs[i],dt);}catch(e){}i++;}
+    var np=[],na=[];
+    for(i=0;i<G.p.cs.length;i++){var cc=G.p.cs[i];if(cc.hp<=0){cc.alive=false;spawnCrystal(true,cc.x,cc.y);}if(cc.alive)np.push(cc);}
+    for(i=0;i<G.a.cs.length;i++){var ca=G.a.cs[i];if(ca.hp<=0){ca.alive=false;spawnCrystal(true,ca.x,ca.y);}if(ca.alive)na.push(ca);}
+    G.p.cs=np;G.a.cs=na;
+  }
   var npt=[];for(i=0;i<G.parts.length;i++){var pp=G.parts[i];pp.x+=pp.vx*dt;pp.y+=pp.vy*dt;pp.vy+=50*dt;pp.life-=dt;if(pp.life>0)npt.push(pp);}G.parts=npt;
   var nd=[];for(i=0;i<G.dmgs.length;i++){var dd=G.dmgs[i];dd.y+=dd.vy*dt;dd.life-=dt;if(dd.life>0)nd.push(dd);}G.dmgs=nd;
   if(G.shake>0)G.shake-=dt;
