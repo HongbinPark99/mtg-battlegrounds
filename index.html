@@ -59,22 +59,34 @@ canvas{position:fixed;top:0;left:0;}
 .pbarw{width:100px;height:3px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden;margin-top:2px;}
 .pbarf{height:100%;border-radius:2px;background:linear-gradient(90deg,#e74c3c,#ff7043);}
 /* SLASH CD bar */
-#slash-hud{position:fixed;bottom:132px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:8px;z-index:10;pointer-events:none;background:rgba(0,0,0,.7);border:1px solid rgba(255,224,102,.3);border-radius:6px;padding:5px 14px;}
+#slash-hud{position:fixed;bottom:152px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:8px;z-index:10;pointer-events:none;background:rgba(0,0,0,.7);border:1px solid rgba(255,224,102,.3);border-radius:6px;padding:5px 14px;}
 .slash-label{font-size:10px;color:#ffe066;letter-spacing:2px;font-family:monospace;}
 .slash-bar-bg{width:100px;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;}
 .slash-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#ffe066,#ffaa00);transition:width .1s;}
 .slash-ready{font-size:10px;color:#ffe066;font-family:monospace;}
 /* CARD BAR */
-#cardbar{position:fixed;bottom:0;left:0;right:0;height:128px;display:none;align-items:center;padding:0 10px;gap:6px;z-index:10;background:linear-gradient(0deg,rgba(0,0,0,.98),rgba(0,0,0,.75));border-top:1px solid rgba(180,140,60,.2);}
-.cs{width:80px;height:112px;border-radius:8px;border:2px solid rgba(255,255,255,.1);background:rgba(6,6,16,.9);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:5px 3px 4px;position:relative;flex-shrink:0;cursor:pointer;}
-.cs.can{border-color:rgba(255,255,255,.32);}
-.cs.cant{opacity:.3;}
-.cskey{position:absolute;top:3px;left:4px;font-size:11px;font-weight:700;color:#c9a227;font-family:monospace;}
-.csmana{position:absolute;top:3px;right:4px;width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#000;}
-.csart{width:48px;height:40px;overflow:hidden;border-radius:4px;}
-.csname{font-size:7px;color:#ddd;text-align:center;}
-.cspt{font-size:12px;font-weight:900;font-family:monospace;}
-.cskw{font-size:6px;text-align:center;}
+#cardbar{position:fixed;bottom:0;left:0;right:0;height:148px;display:none;align-items:center;padding:0 10px;gap:6px;z-index:10;background:linear-gradient(0deg,rgba(0,0,0,.98),rgba(0,0,0,.82));border-top:1px solid rgba(180,140,60,.25);}
+.cs{width:92px;height:132px;border-radius:8px;border:2px solid rgba(255,255,255,.1);background:rgba(6,6,16,.95);display:flex;flex-direction:column;align-items:stretch;position:relative;flex-shrink:0;cursor:pointer;overflow:hidden;transition:transform .12s,border-color .12s;}
+.cs:hover{transform:translateY(-3px);}
+.cs.can{border-color:rgba(255,255,255,.38);}
+.cs.can:hover{border-color:#c9a227;box-shadow:0 0 12px rgba(201,162,39,.3);}
+.cs.cant{opacity:.28;cursor:not-allowed;}
+/* 카드 상단 헤더 (크리처 색상 띠) */
+.cs-header{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 5px;flex-shrink:0;}
+.cs-key{font-size:12px;font-weight:900;color:#c9a227;font-family:monospace;}
+.cs-mana{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#000;flex-shrink:0;}
+/* 아트 영역 */
+.cs-art{width:100%;height:38px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);}
+/* 카드 이름 */
+.cs-name{font-size:8px;font-weight:700;color:#e8d5b7;text-align:center;padding:2px 2px 0;letter-spacing:0.5px;}
+/* 스탯 줄 (공격/체력/인구) */
+.cs-stats{display:flex;align-items:center;justify-content:space-around;padding:2px 4px;font-family:monospace;}
+.cs-pow{font-size:11px;font-weight:900;color:#e74c3c;}
+.cs-hp{font-size:11px;font-weight:900;color:#27ae60;}
+.cs-pop{font-size:9px;color:#888;}
+/* 특성 태그들 */
+.cs-traits{display:flex;flex-wrap:wrap;gap:2px;padding:2px 3px 3px;justify-content:center;}
+.cs-tag{font-size:7px;font-weight:700;border-radius:3px;padding:1px 4px;letter-spacing:0.5px;white-space:nowrap;}
 /* MSG / WARN */
 #msg{position:fixed;top:76px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);border:1px solid rgba(201,162,39,.4);border-radius:4px;padding:6px 18px;font-size:12px;color:#c9a227;pointer-events:none;opacity:0;transition:opacity .3s;z-index:20;white-space:nowrap;}
 #warn{position:fixed;top:44%;left:50%;transform:translate(-50%,-50%);font-size:15px;font-weight:700;letter-spacing:3px;color:#e74c3c;pointer-events:none;opacity:0;transition:opacity .2s;z-index:20;}
@@ -650,25 +662,39 @@ function buildDeckUI(){
     card.className='deck-card';
     card.id='crd_'+k;
 
-    var traitNames={
-      'first':'선제공격','haste':'신속','tough':'강인함',
-      'shield':'방어막','lifesteal':'흡혈','aoe':'광역','berserk':'광전사'
-    };
+    var tagData=TRAIT_TAGS[d.trait]||[];
+    var tagHtml2=tagData.map(function(t){
+      return '<span style="display:inline-block;font-size:7px;font-weight:700;border-radius:3px;padding:1px 5px;background:'+t.bg+';color:'+t.fg+';margin:1px;">'+t.label+'</span>';
+    }).join('');
+    // 속도 태그
+    var spdTag='';
+    if(d.spd>=90)spdTag='<span style="display:inline-block;font-size:7px;font-weight:700;border-radius:3px;padding:1px 5px;background:#1565c0;color:#fff;margin:1px;">💨빠름</span>';
+    else if(d.spd<=55)spdTag='<span style="display:inline-block;font-size:7px;font-weight:700;border-radius:3px;padding:1px 5px;background:#4e342e;color:#ccc;margin:1px;">🐢느림</span>';
+    tagHtml2+=spdTag;
+
     var traitDesc={
-      'first':'반격 전에 먼저 공격','haste':'공격속도 1.7배',
-      'tough':'전투 후 0.5HP 회복','shield':'첫 번째 피해 흡수',
-      'lifesteal':'피해의 50% 회복','aoe':'주변 적에게 추가 피해',
-      'berserk':'HP 50% 이하시 피해 2배'
+      'first':'반격 전에 먼저 공격','haste':'공격·이동 속도 1.7배',
+      'tough':'전투 후 HP 0.5 회복','shield':'첫 피해 1회 완전 무효',
+      'lifesteal':'피해의 50%만큼 HP 회복','aoe':'주변 적에게 추가 1피해',
+      'berserk':'HP 50% 이하 시 피해 2배'
     };
 
     card.innerHTML=
-      '<div style="position:absolute;top:7px;right:8px;background:'+d.col+'33;color:'+d.col+';border:1px solid '+d.col+'66;border-radius:3px;font-size:9px;padding:1px 5px;font-family:monospace;">'+(traitNames[d.trait]||d.trait)+'</div>'
-      +'<div style="position:absolute;top:7px;left:8px;background:#c9a22722;color:#c9a227;border:1px solid #c9a22744;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;font-family:monospace;">'+d.mana+'</div>'
-      +'<canvas id="cvcard_'+k+'" width="56" height="52" style="margin-top:18px;border-radius:5px;background:rgba(0,0,0,0.4);"></canvas>'
-      +'<div style="font-size:12px;font-weight:700;color:#e8d5b7;margin-top:5px;">'+d.nm+'</div>'
-      +'<div style="font-size:14px;font-weight:900;font-family:monospace;color:'+d.col+';margin:2px 0;">'+d.pow+' / '+d.hp+'</div>'
-      +'<div style="font-size:9px;color:#666;line-height:1.5;min-height:28px;">'+(traitDesc[d.trait]||'')+'</div>'
-      +'<div style="font-size:8px;color:#555;margin-top:2px;">마나 비용: '+d.mana+'</div>';
+      // 마나 + 인구수 (좌상단/우상단)
+      '<div style="position:absolute;top:7px;left:8px;background:#c9a22733;color:#c9a227;border:1px solid #c9a22755;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;font-family:monospace;" title="마나 비용">'+d.mana+'</div>'
+      +'<div style="position:absolute;top:7px;right:8px;font-size:9px;color:#777;" title="인구 소모">👥'+(d.pop||1)+'</div>'
+      // 아트
+      +'<canvas id="cvcard_'+k+'" width="56" height="48" style="margin-top:22px;border-radius:5px;background:rgba(0,0,0,0.4);display:block;margin-left:auto;margin-right:auto;"></canvas>'
+      // 이름 + 스탯
+      +'<div style="font-size:12px;font-weight:700;color:#e8d5b7;margin-top:4px;text-align:center;">'+d.nm+'</div>'
+      +'<div style="display:flex;justify-content:center;gap:10px;font-family:monospace;margin:2px 0;">'
+        +'<span style="font-size:12px;font-weight:900;color:#e74c3c;" title="공격력">⚔'+d.pow+'</span>'
+        +'<span style="font-size:12px;font-weight:900;color:#27ae60;" title="체력">❤'+d.hp+'</span>'
+      +'</div>'
+      // 특성 태그들
+      +'<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin:3px 0;">'+tagHtml2+'</div>'
+      // 특성 설명
+      +'<div style="font-size:8px;color:#555;line-height:1.4;text-align:center;min-height:20px;padding:0 4px;">'+(traitDesc[d.trait]||'기본 전투')+'</div>';
 
     card.onclick=function(){toggleCard(k);};
     grid.appendChild(card);
@@ -1012,7 +1038,7 @@ function startMultiGame(){
 }
 
 //  GAME CONSTANTS 
-var ATOP=66,ABOT=128,MMAX=7,MREGEN=0.55,CGRACE=0.7,CDMG=0.8;
+var ATOP=66,ABOT=152,MMAX=7,MREGEN=0.55,CGRACE=0.7,CDMG=0.8;
 var POP_MAX=10; // 최대 인구수
 var G=null,KEYS={},RUN=false,LT=0,GT=0,MT=null,WT=null;
 var SLASH_CD=0,SLASH_ANIM=0,SLASH_DIR=1;
@@ -1061,29 +1087,74 @@ function restartGame(){
 
 //  CARD BAR 
 var HKEYS=['h','j','k','l'];
+
+// 특성별 태그 정의
+var TRAIT_TAGS={
+  first:  [{label:'⚡선제공격',bg:'#b71c1c',fg:'#fff',tip:'첫 타격 우선'}],
+  haste:  [{label:'💨신속',    bg:'#1565c0',fg:'#fff',tip:'빠른 이동·공격'}],
+  tough:  [{label:'🛡강인함',  bg:'#4e342e',fg:'#fff',tip:'매 턴 HP 소량 회복'}],
+  shield: [{label:'🔵방어막',  bg:'#006064',fg:'#fff',tip:'첫 피해 1회 무효'}],
+  lifesteal:[{label:'🩸흡혈',  bg:'#4a148c',fg:'#fff',tip:'딜의 50% 체력 회복'}],
+  aoe:    [{label:'🔥광역',    bg:'#bf360c',fg:'#fff',tip:'주변 적에 추가 피해'}],
+  berserk:[{label:'⚔광전사',  bg:'#e65100',fg:'#fff',tip:'공격속도 빠름'}]
+};
+
 function buildCardBar(cards){
   var bar=document.getElementById('cardbar');bar.innerHTML='';
   for(var i=0;i<4;i++){
     var k=cards[i],d=ALL_DEFS[k];if(!d)continue;
-    var sl=document.createElement('div');sl.className='cs';sl.id='cs'+i;
+    var tags=TRAIT_TAGS[d.trait]||[];
+
+    // 속도 등급
+    var spdLabel='';
+    if(d.spd>=90)spdLabel='<span class="cs-tag" style="background:rgba(21,101,192,.7);color:#fff">💨빠름</span>';
+    else if(d.spd<=55)spdLabel='<span class="cs-tag" style="background:rgba(78,52,46,.7);color:#ccc">🐢느림</span>';
+
+    // 특성 태그 HTML
+    var tagHtml=tags.map(function(t){
+      return '<span class="cs-tag" title="'+t.tip+'" style="background:'+t.bg+';color:'+t.fg+'">'+t.label+'</span>';
+    }).join('')+spdLabel;
+
+    var sl=document.createElement('div');
+    sl.className='cs';sl.id='cs'+i;
     sl.setAttribute('data-idx',i);
     sl.setAttribute('onclick','summonAndSend('+i+')');
-    sl.innerHTML='<div class="cskey">'+HKEYS[i].toUpperCase()+'</div>'
-      +'<div class="csmana" style="background:'+d.col+'">'+d.mana+'</div>'
-      +'<div style="position:absolute;bottom:3px;right:3px;font-size:8px;color:#aaa;">👥'+(d.pop||1)+'</div>'
-      +'<div class="csart"><canvas id="cpv'+i+'" width="48" height="40"></canvas></div>'
-      +'<div class="csname">'+d.nm+'</div>'
-      +'<div class="cspt" style="color:'+d.col+'">'+d.pow+'/'+d.hp+'</div>'
-      +'<div class="cskw" style="color:'+d.col+'">'+d.kw+'</div>';
+
+    // 헤더 (색상 띠)
+    sl.innerHTML=
+      '<div class="cs-header" style="background:linear-gradient(135deg,'+d.col+'44,'+d.col+'22)">'
+        +'<span class="cs-key">'+HKEYS[i].toUpperCase()+'</span>'
+        +'<span class="cs-mana" style="background:'+d.col+'">'+d.mana+'</span>'
+      +'</div>'
+      // 아트
+      +'<div class="cs-art"><canvas id="cpv'+i+'" width="56" height="38"></canvas></div>'
+      // 이름
+      +'<div class="cs-name">'+d.nm+'</div>'
+      // 스탯: 공격⚔ / 체력❤ / 인구👥
+      +'<div class="cs-stats">'
+        +'<span class="cs-pow" title="공격력">⚔'+d.pow+'</span>'
+        +'<span style="color:#444;font-size:9px;">|</span>'
+        +'<span class="cs-hp" title="체력">❤'+d.hp+'</span>'
+        +'<span style="color:#444;font-size:9px;">|</span>'
+        +'<span class="cs-pop" title="인구 소모">👥'+(d.pop||1)+'</span>'
+      +'</div>'
+      // 특성 태그
+      +'<div class="cs-traits">'+tagHtml+'</div>';
+
     bar.appendChild(sl);
   }
+
   var hint=document.createElement('div');hint.className='chint';
   hint.innerHTML='<b>H J K L</b> 소환 &nbsp;<b>WASD</b> 이동 &nbsp;<b>SPACE</b> 공격 &nbsp;<b>Q</b> 스킬 &nbsp;<b>F</b> 합성';
   bar.appendChild(hint);
+
   setTimeout(function(){
     for(var i=0;i<4;i++){
       var pc=document.getElementById('cpv'+i);if(!pc)continue;
-      try{ALL_DEFS[cards[i]].draw(24,24,0,'walk',1);}catch(e){}
+      var cx2=pc.getContext('2d');
+      var saved=CX;CX=cx2;
+      try{ALL_DEFS[cards[i]].draw(28,22,0,'walk',1);}catch(e){}
+      CX=saved;
     }
     refreshBar();
   },80);
