@@ -75,13 +75,6 @@ canvas{position:fixed;top:0;left:0;}
 .csname{font-size:7px;color:#ddd;text-align:center;}
 .cspt{font-size:12px;font-weight:900;font-family:monospace;}
 .cskw{font-size:6px;text-align:center;}
-/* JOYSTICK */
-#joystick-area{position:fixed;bottom:140px;left:20px;width:110px;height:110px;z-index:15;display:none;}
-#joystick-base{width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);position:absolute;}
-#joystick-knob{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.25);border:2px solid rgba(255,255,255,.4);position:absolute;top:33px;left:33px;pointer-events:none;}
-/* ACTION BTNS (mobile) */
-#action-btns{position:fixed;bottom:140px;right:16px;display:none;flex-direction:column;gap:10px;z-index:15;}
-.abtn{width:58px;height:58px;border-radius:50%;border:2px solid rgba(255,255,255,.3);background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:700;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;}
 /* MSG / WARN */
 #msg{position:fixed;top:76px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);border:1px solid rgba(201,162,39,.4);border-radius:4px;padding:6px 18px;font-size:12px;color:#c9a227;pointer-events:none;opacity:0;transition:opacity .3s;z-index:20;white-space:nowrap;}
 #warn{position:fixed;top:44%;left:50%;transform:translate(-50%,-50%);font-size:15px;font-weight:700;letter-spacing:3px;color:#e74c3c;pointer-events:none;opacity:0;transition:opacity .2s;z-index:20;}
@@ -186,17 +179,6 @@ canvas{position:fixed;top:0;left:0;}
   <div class="slash-ready" id="slash-ready">준비됨</div>
 </div>
 
-<!-- 모바일 조이스틱 -->
-<div id="joystick-area">
-  <div id="joystick-base"></div>
-  <div id="joystick-knob"></div>
-</div>
-
-<!-- 모바일 액션 버튼 -->
-<div id="action-btns">
-  <button class="abtn" style="background:rgba(255,224,102,.25);border-color:#ffe066;" ontouchstart="playerSlash();return false;">⚔️<br>공격</button>
-  <button class="abtn" style="background:rgba(100,181,246,.2);border-color:#64b5f6;" ontouchstart="playerSkill();return false;">✨<br>스킬</button>
-</div>
 
 <div id="cardbar"></div>
 <div id="msg"></div>
@@ -1060,11 +1042,6 @@ function startGame(pCards,aCards){
   buildCardBar(PLAYER_DECK);
   spawnCrystal(false,0,0);spawnCrystal(false,0,0);
   // 모바일 UI 표시
-  var isMobile='ontouchstart' in window;
-  var joyEl=document.getElementById('joystick-area');
-  var actEl=document.getElementById('action-btns');
-  if(joyEl)joyEl.style.display=isMobile?'block':'none';
-  if(actEl)actEl.style.display=isMobile?'flex':'none';
   if(!window._RL){window._RL=true;requestAnimationFrame(loop);}
 }
 
@@ -1090,11 +1067,8 @@ function buildCardBar(cards){
       +'<div class="cskw" style="color:'+d.col+'">'+d.kw+'</div>';
     bar.appendChild(sl);
   }
-  var isMobile='ontouchstart' in window;
   var hint=document.createElement('div');hint.className='chint';
-  hint.innerHTML=isMobile
-    ? '<b>조이스틱</b> 이동<br><b>⚔️</b> 공격 &nbsp;<b>✨</b> 스킬<br><b>카드 탭</b> 소환'
-    : '<b>H J K L</b> 소환<br><b>AWSD</b> 이동<br><b>SPACE</b> 칼 휘두르기';
+  hint.innerHTML='<b>H J K L</b> 소환<br><b>WASD</b> 이동<br><b>SPACE</b> 칼 휘두르기<br><b>Q</b> 스킬';
   bar.appendChild(hint);
   setTimeout(function(){
     for(var i=0;i<4;i++){
@@ -1455,57 +1429,6 @@ window.addEventListener('keyup',function(e){
   KEYS[e.key.toLowerCase()]=false;
 });
 
-// ── 모바일 조이스틱 ──
-var JOY={active:false,id:-1,bx:0,by:0,dx:0,dy:0};
-(function(){
-  var area=document.getElementById('joystick-area');
-  var knob=document.getElementById('joystick-knob');
-  if(!area||!knob)return;
-  var R=55; // 베이스 반지름
-  function setKnob(dx,dy){
-    var len=Math.sqrt(dx*dx+dy*dy);
-    var mx=len>R?dx/len*R:dx;
-    var my=len>R?dy/len*R:dy;
-    knob.style.left=(33+mx)+'px';
-    knob.style.top=(33+my)+'px';
-    JOY.dx=len>0?dx/Math.max(len,R):0;
-    JOY.dy=len>0?dy/Math.max(len,R):0;
-  }
-  area.addEventListener('touchstart',function(e){
-    e.preventDefault();
-    var t=e.changedTouches[0];
-    var r=area.getBoundingClientRect();
-    JOY.active=true;JOY.id=t.identifier;
-    JOY.bx=r.left+55;JOY.by=r.top+55;
-    setKnob(t.clientX-JOY.bx,t.clientY-JOY.by);
-  },{passive:false});
-  window.addEventListener('touchmove',function(e){
-    if(!JOY.active)return;
-    for(var i=0;i<e.changedTouches.length;i++){
-      if(e.changedTouches[i].identifier===JOY.id){
-        setKnob(e.changedTouches[i].clientX-JOY.bx,e.changedTouches[i].clientY-JOY.by);
-        e.preventDefault();break;
-      }
-    }
-  },{passive:false});
-  function endJoy(){JOY.active=false;JOY.dx=0;JOY.dy=0;knob.style.left='33px';knob.style.top='33px';}
-  window.addEventListener('touchend',function(e){
-    for(var i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===JOY.id){endJoy();break;}}
-  });
-  window.addEventListener('touchcancel',endJoy);
-})();
-
-// 카드바 터치 소환
-(function(){
-  var bar=document.getElementById('cardbar');
-  if(!bar)return;
-  bar.addEventListener('touchstart',function(e){
-    var t=e.target;while(t&&t!==bar){
-      if(t.dataset&&t.dataset.idx!==undefined){summonAndSend(parseInt(t.dataset.idx));e.preventDefault();break;}
-      t=t.parentNode;
-    }
-  },{passive:false});
-})();
 
 function summonAndSend(idx){
   var key=PLAYER_DECK[idx];if(!key)return;
@@ -1524,9 +1447,7 @@ function moveP(dt){
   if(KEYS['s']||KEYS['ArrowDown'])dy++;
   if(KEYS['a']||KEYS['ArrowLeft'])dx--;
   if(KEYS['d']||KEYS['ArrowRight'])dx++;
-  // 조이스틱 입력
-  if(JOY.active){dx+=JOY.dx;dy+=JOY.dy;}
-  if(dx||dy){var l=Math.sqrt(dx*dx+dy*dy);if(l>1)l=1;p.x+=dx/l*210*dt;p.y+=dy/l*210*dt;if(dx!==0)p.dir=dx>0?1:-1;}
+  if(dx||dy){var l=Math.sqrt(dx*dx+dy*dy);p.x+=dx/l*210*dt;p.y+=dy/l*210*dt;if(dx!==0)p.dir=dx>0?1:-1;}
   if(p.x<22)p.x=22;if(p.x>innerWidth-22)p.x=innerWidth-22;
   if(p.y<ATOP+22)p.y=ATOP+22;if(p.y>innerHeight-ABOT-22)p.y=innerHeight-ABOT-22;
 }
@@ -1682,7 +1603,7 @@ function drawOwner(o){
     // 망토 금장
     CX.fillStyle='#ff6f00';CX.fillRect(-14,-8,28,3);CX.fillRect(-14,12,28,2);
     // 오른손 검
-    var sa2=(st==='atk')?Math.sin(t*16)*0.5:0;
+    var sa2=Math.sin(t*3)*0.15;
     CX.save();CX.translate(16,0);CX.rotate(sa2);
     CX.fillStyle='#455a64';CX.fillRect(-3,-22,5,30);
     CX.fillStyle='#c9a227';CX.fillRect(-7,-6,14,4);
