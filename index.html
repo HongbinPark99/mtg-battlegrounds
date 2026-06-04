@@ -1395,7 +1395,7 @@ function playerSkill(){
 //  SLASH 
 function playerSlash(){
   if(SLASH_CD>0)return;
-  SLASH_CD=SLASH_MAX_CD;SLASH_ANIM=0.35;SLASH_DIR=G.p.dir||1;
+  SLASH_CD=SLASH_MAX_CD;SLASH_ANIM=0.5;SLASH_DIR=G.p.dir||1;
   var px=G.p.x,py=G.p.y,hitAny=false;
   for(var i=0;i<G.a.cs.length;i++){
     var c=G.a.cs[i];if(!c.alive)continue;
@@ -1527,6 +1527,58 @@ function drawCreature(c){
   CX.fillStyle=c.own==='p'?'#3498db':'#e74c3c';CX.beginPath();CX.arc(x,top-21,3,0,P2);CX.fill();
 }
 
+function drawSlashFx(){
+  if(!G||SLASH_ANIM<=0)return;
+  var x=G.p.x,y=G.p.y;
+  var prog=1-(SLASH_ANIM/0.5); // 0→1
+  var al=C01(1-prog*prog);
+  var sd=SLASH_DIR;
+  var R=SLASH_RANGE;
+
+  CX.save();CX.globalAlpha=al;
+
+  // 1) 범위 원 — 유효 범위를 항상 보여줌
+  CX.strokeStyle='rgba(255,224,102,0.35)';CX.lineWidth=1.5;CX.setLineDash([6,4]);
+  CX.beginPath();CX.arc(x,y,R,0,P2);CX.stroke();CX.setLineDash([]);
+
+  // 2) 부채꼴 채우기 — 칼이 지나간 영역
+  var sa=sd>0?-Math.PI*0.75:-Math.PI*0.25;
+  var ea=sd>0? Math.PI*0.25: Math.PI*1.25;
+  // prog에 따라 호가 펼쳐짐
+  var cur_ea=sa+prog*(ea-sa);
+  CX.fillStyle='rgba(255,224,102,0.12)';
+  CX.beginPath();CX.moveTo(x,y);CX.arc(x,y,R,sa,cur_ea);CX.closePath();CX.fill();
+
+  // 3) 칼날 선 — 선명한 흰색 호
+  CX.strokeStyle='rgba(255,255,255,0.9)';CX.lineWidth=3;CX.lineCap='round';
+  CX.shadowColor='#ffe066';CX.shadowBlur=18;
+  CX.beginPath();CX.arc(x,y,R*0.85,sa,cur_ea);CX.stroke();
+
+  // 4) 외곽 글로우
+  CX.strokeStyle='rgba(255,224,102,0.45)';CX.lineWidth=8;
+  CX.shadowBlur=0;
+  CX.beginPath();CX.arc(x,y,R*0.85,sa,cur_ea);CX.stroke();
+
+  // 5) 칼끝 스파크 — 호의 끝 지점에 빛 점
+  var ex=x+Math.cos(cur_ea)*R*0.85;
+  var ey=y+Math.sin(cur_ea)*R*0.85;
+  CX.fillStyle='#fff';CX.shadowColor='#ffe066';CX.shadowBlur=20;
+  CX.beginPath();CX.arc(ex,ey,5*(1-prog*0.5),0,P2);CX.fill();
+
+  // 6) 잔상 라인들 (3개)
+  CX.shadowBlur=0;
+  for(var ti=1;ti<=3;ti++){
+    var tp=prog-ti*0.06;if(tp<0)continue;
+    var ta=C01(1-tp*tp)*(0.3-ti*0.08);
+    var tea=sa+(tp)*(ea-sa);
+    var tsa=tea-0.35;
+    CX.strokeStyle='rgba(255,200,60,'+ta+')';CX.lineWidth=2;
+    CX.beginPath();CX.arc(x,y,R*(0.85-ti*0.04),Math.max(sa,tsa),tea);CX.stroke();
+  }
+
+  CX.restore();
+}
+
 function drawOwner(o){
   var x=o.x,y=o.y;
   var isP=o.isP;
@@ -1642,15 +1694,6 @@ function drawOwner(o){
   CX.fillText(isP?'플레이어':'상대방',x,y-42);
   var lv=o.lv||1;
   if(lv>1){CX.fillStyle='#ffd54f';CX.fillText('Lv.'+lv,x,y-52);}
-  // 슬래시 이펙트
-  if(isP&&SLASH_ANIM>0){
-    var prog=1-SLASH_ANIM/0.35,al=C01(1-prog*prog);
-    CX.save();CX.globalAlpha=al;
-    var sd=SLASH_DIR,sa3=sd>0?-Math.PI*0.7:-Math.PI*0.3,ea3=sd>0?-Math.PI*0.05:Math.PI*0.75;
-    CX.strokeStyle='#64b5f6';CX.lineWidth=4;CX.lineCap='round';CX.beginPath();CX.arc(x+sd*12,y,SLASH_RANGE*0.8,sa3+prog*0.5,ea3+prog*0.5);CX.stroke();
-    CX.strokeStyle='rgba(100,181,246,0.25)';CX.lineWidth=12;CX.beginPath();CX.arc(x+sd*12,y,SLASH_RANGE*0.8,sa3+prog*0.5,ea3+prog*0.5);CX.stroke();
-    CX.restore();
-  }
 }
 
 //  HUD 
@@ -1760,6 +1803,8 @@ function loop(ts){
   for(i=0;i<G.p.cs.length;i++)drawCreature(G.p.cs[i]);
   for(i=0;i<G.a.cs.length;i++)drawCreature(G.a.cs[i]);
   drawOwner(G.p);drawOwner(G.a);
+  // ── 슬래시 이펙트 (독립 레이어) ──
+  drawSlashFx();
   for(i=0;i<G.dmgs.length;i++){var dm=G.dmgs[i];var al2=C01(dm.life/1.2);CX.globalAlpha=al2;CX.font='bold '+(13+(1-al2)*4)+'px monospace';CX.textAlign='center';CX.textBaseline='middle';CX.fillStyle=dm.txt.charAt(0)==='+'?'#00e5ff':(dm.own==='p'?'#ff5555':'#88ff88');CX.fillText(dm.txt,dm.x,dm.y);}
   CX.globalAlpha=1;CX.restore();
   updHUD();
