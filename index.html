@@ -163,6 +163,7 @@ canvas{position:fixed;top:0;left:0;}
   <div id="hctr">
     <div class="htmr" id="timer">00:00</div>
     <div class="hzone">중앙선 = 위험 구역</div>
+    <div id="pop-hud" style="font-size:11px;color:#aaa;letter-spacing:1px;margin-top:2px;">인구 <span id="pop-cur">0</span>/<span id="pop-max">10</span></div>
     <div class="pbarw"><div class="pbarf" id="p-press"></div></div>
     <div id="fusion-hud" style="display:none;margin-top:4px;font-size:10px;color:#e040fb;letter-spacing:1px;text-align:center;">
       🧪 합성 물약 <span id="fusion-count">0</span>개 보유 &nbsp;|&nbsp; <span id="fusion-hint" style="color:#aaa;"></span>
@@ -180,6 +181,8 @@ canvas{position:fixed;top:0;left:0;}
   <div class="slash-label">칼 휘두르기</div>
   <div class="slash-bar-bg"><div class="slash-bar-fill" id="slash-fill" style="width:0%"></div></div>
   <div class="slash-ready" id="slash-ready">준비됨</div>
+  <div style="border-left:1px solid rgba(255,255,255,0.15);margin:0 6px;height:20px;"></div>
+  <div id="skill-indicator" style="font-size:10px;color:#aaa;letter-spacing:1px;font-family:monospace;">[Q] 스킬</div>
 </div>
 
 
@@ -202,7 +205,7 @@ resize();window.addEventListener('resize',resize);
 
 //  ALL CREATURE DEFINITIONS (8 total) 
 var ALL_DEFS={
-  goblin: {nm:'고블린', mana:1,pow:1,hp:1,spd:90,ar:24,cd:0.5,sz:12,col:'#e74c3c',kw:'선제공격',trait:'first',
+  goblin: {nm:'고블린', mana:1,pow:1,hp:1,spd:90,ar:24,cd:0.5,sz:12,col:'#e74c3c',kw:'선제공격',trait:'first',pop:1,
     draw:function(x,y,t,st,d){
       var s=13,b=(st==='walk')?Math.sin(t*11)*2.5:0;
       var run=Math.sin(t*11);
@@ -245,7 +248,7 @@ var ALL_DEFS={
       CX.fillRect(s*0.14,-s*0.71,s*0.08,s*0.1);
       CX.restore();}},
 
-  wolf: {nm:'늑대', mana:2,pow:2,hp:2,spd:100,ar:26,cd:0.42,sz:14,col:'#78909c',kw:'신속',trait:'haste',
+  wolf: {nm:'늑대', mana:2,pow:2,hp:2,spd:100,ar:26,cd:0.42,sz:14,col:'#78909c',kw:'신속',trait:'haste',pop:1,
     draw:function(x,y,t,st,d){
       var s=14,b=(st==='walk')?Math.sin(t*13)*2:0;
       var run=Math.sin(t*13);
@@ -286,7 +289,7 @@ var ALL_DEFS={
       CX.fillStyle='#000';CX.fillRect(s*0.96,-s*0.31,s*0.06,s*0.09);
       CX.restore();}},
 
-  bear: {nm:'그리즐리', mana:2,pow:2,hp:3,spd:65,ar:28,cd:0.75,sz:17,col:'#795548',kw:'강인함',trait:'tough',
+  bear: {nm:'그리즐리', mana:2,pow:2,hp:3,spd:65,ar:28,cd:0.75,sz:17,col:'#795548',kw:'강인함',trait:'tough',pop:2,
     draw:function(x,y,t,st,d){
       var s=17,b=(st==='walk')?Math.sin(t*8)*2:0;
       var run=Math.sin(t*8);
@@ -330,7 +333,7 @@ var ALL_DEFS={
       CX.fillRect(s*0.72,-s*0.46,s*0.05,s*0.06);
       CX.restore();}},
 
-  knight: {nm:'기사', mana:3,pow:3,hp:4,spd:62,ar:32,cd:0.68,sz:18,col:'#c9a227',kw:'방어막',trait:'shield',
+  knight: {nm:'기사', mana:3,pow:3,hp:4,spd:62,ar:32,cd:0.68,sz:18,col:'#c9a227',kw:'방어막',trait:'shield',pop:2,
     draw:function(x,y,t,st,d){
       var s=18,b=(st==='walk')?Math.sin(t*7)*1.8:0;
       var run=Math.sin(t*7);
@@ -376,7 +379,7 @@ var ALL_DEFS={
       for(var pi2=0;pi2<5;pi2++)CX.fillRect(-s*0.32+pi2*s*0.16,-s*1.12-Math.abs(Math.sin(t*6+pi2))*s*0.1,s*0.1,s*0.2);
       CX.restore();}},
 
-  angel: {nm:'세라천사', mana:4,pow:3,hp:5,spd:75,ar:36,cd:0.8,sz:20,col:'#5c6bc0',kw:'흡혈',trait:'lifesteal',
+  angel: {nm:'세라천사', mana:4,pow:3,hp:5,spd:75,ar:36,cd:0.8,sz:20,col:'#5c6bc0',kw:'흡혈',trait:'lifesteal',pop:3,
     draw:function(x,y,t,st,d){
       var s=20,fl=Math.sin(t*2.8)*6;
       var wf=Math.sin(t*3)*0.4;
@@ -428,7 +431,7 @@ var ALL_DEFS={
       CX.beginPath();CX.ellipse(0,-s*1.02,s*0.32,s*0.1,0,0,P2);CX.stroke();
       CX.restore();}},
 
-  golem: {nm:'골렘', mana:3,pow:2,hp:6,spd:52,ar:30,cd:0.9,sz:22,col:'#78909c',kw:'방어막',trait:'shield',
+  golem: {nm:'골렘', mana:3,pow:2,hp:6,spd:52,ar:30,cd:0.9,sz:22,col:'#78909c',kw:'방어막',trait:'shield',pop:3,
     draw:function(x,y,t,st,d){
       var s=22,b=(st==='walk')?Math.sin(t*5)*1.5:0;
       var run=Math.sin(t*5);
@@ -479,7 +482,7 @@ var ALL_DEFS={
       CX.fillStyle='rgba(0,229,255,0.4)';CX.fillRect(-s*0.24,-s*0.29,s*0.48,s*0.06);
       CX.restore();}},
 
-  berserker: {nm:'광전사', mana:3,pow:4,hp:3,spd:80,ar:30,cd:0.58,sz:16,col:'#ff6f00',kw:'광전사',trait:'berserk',
+  berserker: {nm:'광전사', mana:3,pow:4,hp:3,spd:80,ar:30,cd:0.58,sz:16,col:'#ff6f00',kw:'광전사',trait:'berserk',pop:2,
     draw:function(x,y,t,st,d){
       var s=16,b=(st==='walk')?Math.sin(t*10)*2.5:0;
       var run=Math.sin(t*10);
@@ -532,7 +535,7 @@ var ALL_DEFS={
       }
       CX.restore();}},
 
-  dragon: {nm:'드래곤', mana:5,pow:5,hp:5,spd:70,ar:40,cd:0.95,sz:24,col:'#c62828',kw:'광역화염',trait:'aoe',
+  dragon: {nm:'드래곤', mana:5,pow:5,hp:5,spd:70,ar:40,cd:0.95,sz:24,col:'#c62828',kw:'광역화염',trait:'aoe',pop:4,
     draw:function(x,y,t,st,d){
       var s=24,fl=Math.sin(t*3.2)*5;
       var wf=Math.sin(t*3)*0.45;
@@ -1010,6 +1013,7 @@ function startMultiGame(){
 
 //  GAME CONSTANTS 
 var ATOP=66,ABOT=128,MMAX=7,MREGEN=0.55,CGRACE=0.7,CDMG=0.8;
+var POP_MAX=10; // 최대 인구수
 var G=null,KEYS={},RUN=false,LT=0,GT=0,MT=null,WT=null;
 var SLASH_CD=0,SLASH_ANIM=0,SLASH_DIR=1;
 var SLASH_RANGE=65,SLASH_DMG=1,SLASH_MAX_CD=1.8;
@@ -1066,6 +1070,7 @@ function buildCardBar(cards){
     sl.setAttribute('onclick','summonAndSend('+i+')');
     sl.innerHTML='<div class="cskey">'+HKEYS[i].toUpperCase()+'</div>'
       +'<div class="csmana" style="background:'+d.col+'">'+d.mana+'</div>'
+      +'<div style="position:absolute;bottom:3px;right:3px;font-size:8px;color:#aaa;">👥'+(d.pop||1)+'</div>'
       +'<div class="csart"><canvas id="cpv'+i+'" width="48" height="40"></canvas></div>'
       +'<div class="csname">'+d.nm+'</div>'
       +'<div class="cspt" style="color:'+d.col+'">'+d.pow+'/'+d.hp+'</div>'
@@ -1093,9 +1098,23 @@ function refreshBar(){
 }
 
 //  SUMMON 
+function getPop(owner){
+  var total=0;
+  for(var i=0;i<owner.cs.length;i++){
+    if(owner.cs[i].alive){var pd=owner.cs[i].d||ALL_DEFS[owner.cs[i].key];total+=(pd&&pd.pop)||1;}
+  }
+  return total;
+}
+
 function summon(owner,key){
   var d=ALL_DEFS[key];if(!d)return;
   if(owner.mana<d.mana){if(owner.isP)showMsg('마나 부족 (필요: '+d.mana+')');return;}
+  // 인구수 체크
+  var curPop=getPop(owner);
+  var cost=d.pop||1;
+  if(curPop+cost>POP_MAX){
+    if(owner.isP)showMsg('⚠ 인구 한도 초과! ('+curPop+'/'+POP_MAX+')');return;
+  }
   owner.mana-=d.mana;
   var sd=owner.isP?1:-1,sx=owner.x+sd*44,sy=owner.y+(Math.random()-0.5)*80;
   if(sy<ATOP+30)sy=ATOP+30;if(sy>innerHeight-ABOT-30)sy=innerHeight-ABOT-30;
@@ -1104,7 +1123,7 @@ function summon(owner,key){
     trait:d.trait,shieldUp:shieldActive,t:0,sp:0,st:'walk',at:0,hd:false,alive:true,
     own:owner.isP?'p':'a',dir:sd,ttype:'',tobj:null,idt:0,pendingDmg:0});
   spawnFx(sx,sy,d.col,12,75);
-  if(owner.isP)showMsg(d.nm+' ['+d.pow+'/'+d.hp+'] '+d.kw);
+  if(owner.isP)showMsg(d.nm+' ['+d.pow+'/'+d.hp+'] 인구: '+(curPop+cost)+'/'+POP_MAX);
 }
 
 //  AI 
@@ -1141,6 +1160,8 @@ function isEngaged(enemy, myCs, self){
 function updCreature(c,dt){
   if(!c.alive)return;
   c.t+=dt;c.sp+=dt;
+  // 무적 타이머
+  if(c.invincible>0){c.invincible-=dt;if(c.invincible<0)c.invincible=0;}
   var en=c.own==='p'?G.a:G.p;
   var myCs=c.own==='p'?G.p.cs:G.a.cs;
   var ecs=en.cs;
@@ -1217,6 +1238,7 @@ function updCreature(c,dt){
       if(c.pendingDmg){
         var dmg=c.pendingDmg;c.pendingDmg=0;
         if(c.shieldUp){c.shieldUp=false;spawnFx(c.x,c.y,'#00bcd4',8,60);spawnDmg(c.x,c.y,'막음',c.own);}
+        else if(c.invincible>0){spawnFx(c.x,c.y,'#e040fb',5,50);spawnDmg(c.x,c.y,'무적!',c.own);}
         else{c.hp-=dmg;spawnFx(c.x,c.y,'#ff4444',8,60);spawnDmg(c.x,c.y,'-'+dmg,c.own==='p'?'a':'p');}
       }
       if(c.tobj&&c.ttype==='c'&&c.tobj.pendingDmg){
@@ -1473,22 +1495,23 @@ function doFuse(ca,cb){
   var fused={
     key:ca.key,d:d,
     x:mx,y:my2,spx:mx,spy:my2,
-    hp:d.hp*2+2,mhp:d.hp*2+2,
-    pow:d.pow+2,
-    spd:(d.spd||60)*1.3,
-    sz:Math.round(d.sz*1.4),
-    ar:d.ar||28,cd:(d.cd||1)*0.7,
-    trait:d.trait,shieldUp:false,
+    hp:d.hp*3+5,  mhp:d.hp*3+5,   // HP 3배+5
+    pow:d.pow*2+3,                   // 공격력 2배+3
+    spd:(d.spd||60)*1.5,            // 속도 +50%
+    sz:Math.round(d.sz*1.6),        // 크기 +60%
+    ar:(d.ar||28)*1.5,cd:(d.cd||1)*0.5,
+    trait:d.trait,shieldUp:true,    // 방어막도 자동 활성화
     t:0,sp:0,st:'walk',at:0,hd:false,
     alive:true,own:'p',dir:G.p.dir||1,
     ttype:'',tobj:null,idt:0,pendingDmg:0,
-    fused:true
+    fused:true,
+    invincible:3.0,  // 3초 무적
+    ranged:true      // 원거리 공격 가능
   };
   G.p.cs.push(fused);
-  spawnFx(mx,my2,'#e040fb',30,130);
-  spawnFx(mx,my2,'#fff',15,80);
-  G.shake=0.4;
-  showMsg('✨ '+d.nm+' [합성] 완료! HP+'+(d.hp*2+2)+' 공격+2');
+  spawnFx(mx,my2,'#e040fb',40,160);spawnFx(mx,my2,'#fff',20,100);spawnFx(mx,my2,d.col,20,120);
+  G.shake=0.5;
+  showMsg('✨ [합성] '+d.nm+'! HP '+(d.hp*3+5)+' 공격 '+(d.pow*2+3)+' 무적3초 원거리공격!');
 }
 
 function updFusionHUD(){
@@ -1537,40 +1560,119 @@ function drawBossCrystal(){
 
 //  SKILL (Q키) 
 var SKILL_MAX_CD=12;
+function getSkillType(deck){
+  if(!deck)return'blast';
+  var has=function(k){return deck.indexOf(k)>=0;};
+  if(has('dragon')||has('berserker'))return'lightning';
+  if(has('angel')||has('goblin'))return'heal';
+  if(has('golem')||has('knight'))return'shield_bash';
+  return'blast';
+}
 function playerSkill(){
-  if(!G||G.p.skillCD>0)return;
+  if(!G||G.p.skillCD>0){showMsg('스킬 쿨타임: '+Math.ceil(G.p.skillCD)+'초');return;}
   G.p.skillCD=SKILL_MAX_CD;
-  // 덱에 따라 다른 스킬
-  var hasAtk=PLAYER_DECK.some(function(k){return k==='dragon'||k==='berserker';});
-  var hasHeal=PLAYER_DECK.some(function(k){return k==='angel'||k==='goblin';});
-  if(hasAtk){
-    // 번개 폭격: 상대 크리처 전체에 2데미지
-    for(var i=0;i<G.a.cs.length;i++){
-      if(!G.a.cs[i].alive)continue;
-      G.a.cs[i].hp-=2;
-      spawnFx(G.a.cs[i].x,G.a.cs[i].y,'#ffe066',10,80);
-      spawnDmg(G.a.cs[i].x,G.a.cs[i].y,'-2','p');
-    }
-    G.a.hp-=1;spawnFx(G.a.x,G.a.y,'#ffe066',15,100);
-    showMsg('⚡ 번개 폭격!');G.shake=0.25;
-  } else if(hasHeal){
-    // 신성한 치유: 체력 5 회복
-    G.p.hp=Math.min(G.p.hp+5,G.p.mhp);
-    spawnFx(G.p.x,G.p.y,'#27ae60',20,80);
-    spawnDmg(G.p.x,G.p.y,'+5','p');
-    showMsg('💚 신성한 치유!');
-  } else {
-    // 광역 폭발: 주변 전체 2데미지
-    var pr=120;
-    for(var j=0;j<G.a.cs.length;j++){
-      if(!G.a.cs[j].alive)continue;
-      var dx=G.a.cs[j].x-G.p.x,dy=G.a.cs[j].y-G.p.y;
-      if(dx*dx+dy*dy<pr*pr){G.a.cs[j].hp-=2;spawnFx(G.a.cs[j].x,G.a.cs[j].y,'#e74c3c',8,70);}
-    }
-    spawnFx(G.p.x,G.p.y,'#e74c3c',25,150);
-    showMsg('💥 광역 폭발!');G.shake=0.3;
-  }
+  var type=getSkillType(PLAYER_DECK);
+  execSkill(G.p,G.a,type,true);
   if(gameMode==='multi'&&multiRole==='guest')peerSend({type:'input',skill:true});
+}
+function remoteSkill(){
+  if(!G)return;
+  var type=getSkillType(AI_DECK);
+  execSkill(G.a,G.p,type,false);
+}
+function execSkill(caster,target,type,isPlayer){
+  var cx=caster.x,cy=caster.y;
+  if(type==='lightning'){
+    // ⚡ 번개 — 상대 모든 크리처에 굵은 번개 선 + 2데미지
+    for(var i=0;i<target.cs.length;i++){
+      var c=target.cs[i];if(!c.alive)continue;
+      c.hp-=2;
+      spawnDmg(c.x,c.y,'-2',isPlayer?'p':'a');
+      // 번개 파티클
+      spawnFx(c.x,c.y,'#ffe066',12,100);spawnFx(c.x,c.y,'#fff',6,60);
+    }
+    target.hp-=1;spawnFx(target.x,target.y,'#ffe066',18,120);
+    G.SKILL_FX={type:'lightning',t:0,cx:cx,cy:cy,targets:target.cs.filter(function(c){return c.alive;}).map(function(c){return{x:c.x,y:c.y};})};
+    G.shake=0.3;showMsg('⚡ 번개 폭격! 적 전체 2데미지');
+  } else if(type==='heal'){
+    // 💚 신성 치유 — 플레이어 주변에 초록 원 이펙트 + HP 회복
+    caster.hp=Math.min(caster.hp+6,caster.mhp);
+    spawnFx(cx,cy,'#27ae60',28,90);spawnFx(cx,cy,'#a5d6a7',14,60);
+    spawnDmg(cx,cy,'+6',isPlayer?'p':'a');
+    G.SKILL_FX={type:'heal',t:0,cx:cx,cy:cy};
+    showMsg('💚 신성한 치유! +6 HP');
+  } else if(type==='shield_bash'){
+    // 🛡 방패 강타 — 전방 크리처 전체 기절 + 3데미지
+    var dir=caster.dir||1;
+    var count=0;
+    for(var j=0;j<target.cs.length;j++){
+      var tc=target.cs[j];if(!tc.alive)continue;
+      var inFront=(dir>0&&tc.x>cx)||(dir<0&&tc.x<cx);
+      if(!inFront)continue;
+      tc.hp-=3;tc.idt=2.0; // 2초 기절(이동/공격 중단)
+      spawnFx(tc.x,tc.y,'#c9a227',10,80);spawnDmg(tc.x,tc.y,'-3',isPlayer?'p':'a');
+      count++;
+    }
+    G.SKILL_FX={type:'shield_bash',t:0,cx:cx,cy:cy,dir:dir};
+    G.shake=0.35;showMsg('🛡 방패 강타! 전방 '+(count||0)+'마리 기절+3데미지');
+  } else {
+    // 💥 광역 폭발
+    var pr=130;
+    for(var k=0;k<target.cs.length;k++){
+      var ec=target.cs[k];if(!ec.alive)continue;
+      var dx=ec.x-cx,dy=ec.y-cy;
+      if(dx*dx+dy*dy<pr*pr){ec.hp-=2;spawnFx(ec.x,ec.y,'#e74c3c',8,70);spawnDmg(ec.x,ec.y,'-2',isPlayer?'p':'a');}
+    }
+    G.SKILL_FX={type:'blast',t:0,cx:cx,cy:cy,r:pr};
+    spawnFx(cx,cy,'#e74c3c',30,160);G.shake=0.35;showMsg('💥 광역 폭발! 반경 내 2데미지');
+  }
+}
+function drawSkillFx(){
+  if(!G||!G.SKILL_FX)return;
+  var fx=G.SKILL_FX;
+  fx.t+=0.016;
+  var al=C01(1-fx.t/0.6);
+  if(al<=0){G.SKILL_FX=null;return;}
+  CX.save();CX.globalAlpha=al;
+  if(fx.type==='lightning'){
+    // 번개 줄기
+    CX.strokeStyle='#ffe066';CX.lineWidth=3;CX.shadowColor='#ffe066';CX.shadowBlur=15;
+    if(fx.targets)for(var i=0;i<fx.targets.length;i++){
+      CX.beginPath();CX.moveTo(fx.cx,fx.cy);
+      // 지그재그
+      var tx=fx.targets[i].x,ty=fx.targets[i].y;
+      var mx=(fx.cx+tx)/2+(Math.random()-0.5)*40;
+      var my=(fx.cy+ty)/2+(Math.random()-0.5)*40;
+      CX.quadraticCurveTo(mx,my,tx,ty);CX.stroke();
+    }
+    // 번개 원점 플래시
+    CX.fillStyle='rgba(255,255,200,0.5)';CX.beginPath();CX.arc(fx.cx,fx.cy,40*al,0,P2);CX.fill();
+  } else if(fx.type==='heal'){
+    // 치유 파동
+    for(var r=0;r<3;r++){
+      var rad=30+r*35+fx.t*120;
+      CX.strokeStyle='rgba(39,174,96,'+(al*(1-r*0.25))+')';CX.lineWidth=3-r*0.8;
+      CX.beginPath();CX.arc(fx.cx,fx.cy,rad,0,P2);CX.stroke();
+    }
+    CX.fillStyle='rgba(39,174,96,0.15)';CX.beginPath();CX.arc(fx.cx,fx.cy,80,0,P2);CX.fill();
+  } else if(fx.type==='shield_bash'){
+    // 충격파
+    CX.fillStyle='rgba(201,162,39,0.2)';
+    CX.beginPath();
+    var sa=fx.dir>0?-Math.PI*0.5:-Math.PI*0.5;
+    CX.moveTo(fx.cx,fx.cy);
+    CX.arc(fx.cx,fx.cy,120+fx.t*200,sa,sa+Math.PI);
+    CX.closePath();CX.fill();
+    CX.strokeStyle='rgba(201,162,39,0.7)';CX.lineWidth=3;CX.beginPath();
+    CX.arc(fx.cx,fx.cy,120+fx.t*200,sa,sa+Math.PI);CX.stroke();
+  } else if(fx.type==='blast'){
+    // 폭발 링
+    CX.strokeStyle='rgba(231,76,60,0.85)';CX.lineWidth=4;
+    CX.beginPath();CX.arc(fx.cx,fx.cy,fx.r*(0.5+fx.t*2),0,P2);CX.stroke();
+    CX.strokeStyle='rgba(255,140,0,0.5)';CX.lineWidth=8;
+    CX.beginPath();CX.arc(fx.cx,fx.cy,fx.r*(0.3+fx.t*1.5),0,P2);CX.stroke();
+  }
+  CX.shadowBlur=0;CX.restore();
 }
 
 //  SLASH 
@@ -1702,6 +1804,18 @@ function drawCreature(c){
     CX.shadowColor='#e040fb';CX.shadowBlur=12;
     CX.beginPath();CX.arc(x,y,sz+7,0,P2);CX.stroke();
     CX.shadowBlur=0;
+  }
+  // 무적 쉴드 이펙트
+  if(c.invincible>0){
+    var ipulse=0.5+Math.sin(GT*12)*0.5;
+    CX.strokeStyle='rgba(224,64,251,'+ipulse+')';CX.lineWidth=4;
+    CX.shadowColor='#e040fb';CX.shadowBlur=20;
+    CX.beginPath();CX.arc(x,y,sz+10,0,P2);CX.stroke();
+    CX.shadowBlur=0;
+    // 무적 남은 시간
+    CX.font='bold 10px monospace';CX.fillStyle='#e040fb';
+    CX.textAlign='center';CX.textBaseline='middle';
+    CX.fillText('무적 '+c.invincible.toFixed(1),x,y-sz-18);
   }
   try{c.d.draw(x,y,c.t,c.st,c.dir);}catch(e){}
   var bw=sz*2.2,top=y-sz-9;
@@ -1907,6 +2021,21 @@ function updHUD(){
     sf.style.background=rdy?'#ffe066':'linear-gradient(90deg,#ffe066,#ffaa00)';
   }
   if(sr){sr.textContent=SLASH_CD<=0?'준비됨':Math.ceil(SLASH_CD)+'초';sr.style.color=SLASH_CD<=0?'#ffe066':'#888';}
+  // 스킬 인디케이터
+  var si=document.getElementById('skill-indicator');
+  if(si&&G){
+    var stype=getSkillType(PLAYER_DECK);
+    var snames={lightning:'⚡ 번개 폭격',heal:'💚 신성 치유',shield_bash:'🛡 방패 강타',blast:'💥 광역 폭발'};
+    var srdy=G.p.skillCD<=0;
+    si.textContent='[Q] '+(snames[stype]||'스킬')+(srdy?'':' ('+Math.ceil(G.p.skillCD)+'초)');
+    si.style.color=srdy?'#e040fb':'#555';
+  }
+  var pc=document.getElementById('pop-cur');
+  if(pc){
+    var curPop=getPop(G.p);
+    pc.textContent=curPop;
+    pc.style.color=curPop>=POP_MAX?'#e74c3c':curPop>=POP_MAX*0.7?'#f39c12':'#aaa';
+  }
   refreshBar();
 }
 function updMana(id,m,max,col){
@@ -1998,6 +2127,7 @@ function loop(ts){
   drawOwner(G.p);drawOwner(G.a);
   // ── 슬래시 이펙트 (독립 레이어) ──
   drawSlashFx();
+  drawSkillFx();
   for(i=0;i<G.dmgs.length;i++){var dm=G.dmgs[i];var al2=C01(dm.life/1.2);CX.globalAlpha=al2;CX.font='bold '+(13+(1-al2)*4)+'px monospace';CX.textAlign='center';CX.textBaseline='middle';CX.fillStyle=dm.txt.charAt(0)==='+'?'#00e5ff':(dm.own==='p'?'#ff5555':'#88ff88');CX.fillText(dm.txt,dm.x,dm.y);}
   CX.globalAlpha=1;CX.restore();
   updHUD();
