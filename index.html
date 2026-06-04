@@ -164,6 +164,9 @@ canvas{position:fixed;top:0;left:0;}
     <div class="htmr" id="timer">00:00</div>
     <div class="hzone">중앙선 = 위험 구역</div>
     <div class="pbarw"><div class="pbarf" id="p-press"></div></div>
+    <div id="fusion-hud" style="display:none;margin-top:4px;font-size:10px;color:#e040fb;letter-spacing:1px;text-align:center;">
+      🧪 합성 물약 <span id="fusion-count">0</span>개 보유 &nbsp;|&nbsp; <span id="fusion-hint" style="color:#aaa;"></span>
+    </div>
   </div>
   <div class="hside" style="align-items:flex-end;">
     <div class="hlbl">상대방</div>
@@ -1037,7 +1040,9 @@ function startGame(pCards,aCards){
   G={
     p:{isP:true, x:px,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:pd,kills:0,lv:1,skillCD:0},
     a:{isP:false,x:ax,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:ad,kills:0,lv:1,skillCD:0},
-    aiT:1.8,parts:[],dmgs:[],shake:0,crystals:[],cTimer:8,bossCrystal:null,bossCTimer:20
+    aiT:1.8,parts:[],dmgs:[],shake:0,crystals:[],cTimer:8,bossCrystal:null,bossCTimer:20,
+    potions:[],potionTimer:18,  // 합성 물약
+    fusionPotions:0             // 플레이어 보유 물약 수
   };
   buildCardBar(PLAYER_DECK);
   spawnCrystal(false,0,0);spawnCrystal(false,0,0);
@@ -1068,7 +1073,7 @@ function buildCardBar(cards){
     bar.appendChild(sl);
   }
   var hint=document.createElement('div');hint.className='chint';
-  hint.innerHTML='<b>H J K L</b> 소환<br><b>WASD</b> 이동<br><b>SPACE</b> 칼 휘두르기<br><b>Q</b> 스킬';
+  hint.innerHTML='<b>H J K L</b> 소환 &nbsp;<b>WASD</b> 이동 &nbsp;<b>SPACE</b> 공격 &nbsp;<b>Q</b> 스킬 &nbsp;<b>F</b> 합성';
   bar.appendChild(hint);
   setTimeout(function(){
     for(var i=0;i<4;i++){
@@ -1332,6 +1337,182 @@ function updBossCrystal(dt){
     return;
   }
 }
+// ══════════════════════════════════════════
+//  합성 물약 시스템
+// ══════════════════════════════════════════
+var FUSION_RANGE=90;
+
+function updPotions(dt){
+  if(!G)return;
+  G.potionTimer-=dt;
+  if(G.potionTimer<=0){
+    var side=Math.random()<0.5?-1:1;
+    var px2=innerWidth/2+side*(80+Math.random()*(innerWidth/2-120));
+    var py2=ATOP+60+Math.random()*(AH()-120);
+    G.potions.push({x:px2,y:py2,t:0,life:20});
+    G.potionTimer=22+Math.random()*18;
+  }
+  var np=[];
+  for(var i=0;i<G.potions.length;i++){
+    var pot=G.potions[i];
+    pot.t+=dt;pot.life-=dt;
+    if(pot.life<=0)continue;
+    var dx=G.p.x-pot.x,dy=G.p.y-pot.y;
+    if(dx*dx+dy*dy<28*28){
+      G.fusionPotions++;
+      spawnFx(pot.x,pot.y,'#e040fb',18,90);
+      showMsg('🧪 합성 물약 획득! (총 '+G.fusionPotions+'개)');
+      updFusionHUD();
+      continue;
+    }
+    np.push(pot);
+  }
+  G.potions=np;
+}
+
+function drawPotions(){
+  if(!G)return;
+  for(var i=0;i<G.potions.length;i++){
+    var pot=G.potions[i];
+    var bob=Math.sin(pot.t*3)*4;
+    var al=Math.min(1,pot.life/3);
+    CX.save();CX.globalAlpha=al;CX.translate(pot.x,pot.y+bob);
+    CX.shadowColor='#e040fb';CX.shadowBlur=14;
+    CX.fillStyle='#7b1fa2';CX.fillRect(-7,-14,14,18);
+    CX.fillStyle='#9c27b0';CX.fillRect(-4,-16,8,5);
+    CX.fillStyle='#f8bbd0';CX.fillRect(-2,-16,4,3);
+    CX.fillStyle='rgba(224,64,251,0.85)';CX.fillRect(-6,-12,12,15);
+    CX.fillStyle='rgba(255,255,255,0.5)';CX.fillRect(-4,-11,3,8);
+    if(pot.life<5){
+      CX.font='bold 9px monospace';CX.fillStyle='#ff8a80';
+      CX.textAlign='center';CX.textBaseline='bottom';
+      CX.fillText(Math.ceil(pot.life),0,-20);
+    }
+    CX.shadowBlur=0;CX.restore();
+  }
+}
+
+var FUSION_PAIRS=[];
+
+function checkFusion(){
+  if(!G){FUSION_PAIRS=[];return;}
+  FUSION_PAIRS=[];
+  if(G.fusionPotions<=0){updFusionHUD();return;}
+  var cs=G.p.cs;
+  for(var i=0;i<cs.length;i++){
+    for(var j=i+1;j<cs.length;j++){
+      if(!cs[i].alive||!cs[j].alive)continue;
+      if(cs[i].key!==cs[j].key)continue;
+      if(cs[i].fused||cs[j].fused)continue;
+      var mx=(cs[i].x+cs[j].x)/2;
+      var my2=(cs[i].y+cs[j].y)/2;
+      var pdx=G.p.x-mx,pdy=G.p.y-my2;
+      var playerNear=pdx*pdx+pdy*pdy<FUSION_RANGE*FUSION_RANGE;
+      FUSION_PAIRS.push({a:cs[i],b:cs[j],mx:mx,my:my2,playerNear:playerNear});
+    }
+  }
+  updFusionHUD();
+}
+
+function drawFusionIndicators(){
+  if(!G||FUSION_PAIRS.length===0)return;
+  for(var i=0;i<FUSION_PAIRS.length;i++){
+    var fp=FUSION_PAIRS[i];
+    CX.save();
+    CX.strokeStyle=fp.playerNear?'rgba(224,64,251,0.9)':'rgba(224,64,251,0.4)';
+    CX.lineWidth=fp.playerNear?2.5:1.5;CX.setLineDash([6,4]);
+    CX.beginPath();CX.moveTo(fp.a.x,fp.a.y);CX.lineTo(fp.b.x,fp.b.y);CX.stroke();
+    CX.setLineDash([]);
+    var pulse=0.6+Math.sin(GT*6)*0.4;
+    CX.globalAlpha=pulse;
+    CX.fillStyle=fp.playerNear?'rgba(224,64,251,0.25)':'rgba(224,64,251,0.08)';
+    CX.beginPath();CX.arc(fp.mx,fp.my,FUSION_RANGE,0,P2);CX.fill();
+    CX.strokeStyle=fp.playerNear?'#e040fb':'rgba(224,64,251,0.4)';
+    CX.lineWidth=fp.playerNear?2:1;
+    CX.beginPath();CX.arc(fp.mx,fp.my,FUSION_RANGE,0,P2);CX.stroke();
+    CX.font='bold '+(fp.playerNear?20:14)+'px serif';
+    CX.textAlign='center';CX.textBaseline='middle';
+    CX.globalAlpha=pulse;
+    CX.fillStyle=fp.playerNear?'#e040fb':'rgba(224,64,251,0.6)';
+    CX.fillText('⚗',fp.mx,fp.my);
+    if(fp.playerNear){
+      var d=ALL_DEFS[fp.a.key];
+      var manaCost=d?d.mana:2;
+      CX.globalAlpha=1;
+      CX.fillStyle='rgba(0,0,0,0.7)';CX.fillRect(fp.mx-60,fp.my+FUSION_RANGE+6,120,20);
+      CX.fillStyle='#e040fb';CX.font='bold 11px Georgia';
+      CX.fillText('[F] 합성 (마나 '+manaCost+')',fp.mx,fp.my+FUSION_RANGE+16);
+    }
+    CX.restore();
+  }
+}
+
+function tryFuse(){
+  if(!G||G.fusionPotions<=0){showMsg('🧪 합성 물약이 없습니다!');return;}
+  for(var i=0;i<FUSION_PAIRS.length;i++){
+    var fp=FUSION_PAIRS[i];
+    if(!fp.playerNear)continue;
+    var d=ALL_DEFS[fp.a.key];
+    if(!d)continue;
+    var cost=d.mana;
+    if(G.p.mana<cost){showMsg('마나 부족! (필요: '+cost+')');return;}
+    G.p.mana-=cost;
+    G.fusionPotions--;
+    doFuse(fp.a,fp.b);
+    updFusionHUD();
+    return;
+  }
+  showMsg('⚗ 합성 지점으로 이동 후 [F] 누르기');
+}
+
+function doFuse(ca,cb){
+  ca.hp=-1;cb.hp=-1;
+  var d=ALL_DEFS[ca.key];
+  if(!d)return;
+  var mx=(ca.x+cb.x)/2,my2=(ca.y+cb.y)/2;
+  var fused={
+    key:ca.key,d:d,
+    x:mx,y:my2,spx:mx,spy:my2,
+    hp:d.hp*2+2,mhp:d.hp*2+2,
+    pow:d.pow+2,
+    spd:(d.spd||60)*1.3,
+    sz:Math.round(d.sz*1.4),
+    ar:d.ar||28,cd:(d.cd||1)*0.7,
+    trait:d.trait,shieldUp:false,
+    t:0,sp:0,st:'walk',at:0,hd:false,
+    alive:true,own:'p',dir:G.p.dir||1,
+    ttype:'',tobj:null,idt:0,pendingDmg:0,
+    fused:true
+  };
+  G.p.cs.push(fused);
+  spawnFx(mx,my2,'#e040fb',30,130);
+  spawnFx(mx,my2,'#fff',15,80);
+  G.shake=0.4;
+  showMsg('✨ '+d.nm+' [합성] 완료! HP+'+(d.hp*2+2)+' 공격+2');
+}
+
+function updFusionHUD(){
+  var el=document.getElementById('fusion-hud');
+  var cnt=document.getElementById('fusion-count');
+  var hint=document.getElementById('fusion-hint');
+  if(!G||!el)return;
+  el.style.display='block';
+  if(cnt)cnt.textContent=G.fusionPotions||0;
+  if(hint){
+    if(G.fusionPotions>0&&FUSION_PAIRS.length>0){
+      var any=FUSION_PAIRS.some(function(fp){return fp.playerNear;});
+      hint.textContent=any?'[F] 눌러서 합성!':'⚗ 위치로 이동';
+      hint.style.color=any?'#e040fb':'#aaa';
+    } else if(G.fusionPotions>0){
+      hint.textContent='같은 크리처 2마리 소환';
+      hint.style.color='#aaa';
+    } else {
+      hint.textContent='보라색 물약을 먹으면 합성 가능';
+      hint.style.color='#555';
+    }
+  }
+}
+
 function drawBossCrystal(){
   if(!G.bossCrystal)return;
   var bc=G.bossCrystal;
@@ -1423,6 +1604,7 @@ window.addEventListener('keydown',function(e){
   else if(kl==='l')summonAndSend(3);
   else if(k===' '){e.preventDefault();playerSlash();}
   else if(kl==='q'){e.preventDefault();playerSkill();}
+  else if(kl==='f'){e.preventDefault();tryFuse();}
 });
 window.addEventListener('keyup',function(e){
   KEYS[e.key]=false;
@@ -1514,6 +1696,13 @@ function drawCreature(c){
   CX.fillStyle='rgba('+ar[0]+','+ar[1]+','+ar[2]+',0.1)';CX.beginPath();CX.arc(x,y,sz*2,0,P2);CX.fill();
   // shield glow
   if(c.shieldUp){CX.strokeStyle='rgba(0,188,212,0.7)';CX.lineWidth=2.5;CX.beginPath();CX.arc(x,y,sz+5,0,P2);CX.stroke();}
+  // 합성 크리처 글로우
+  if(c.fused){
+    CX.strokeStyle='rgba(224,64,251,0.8)';CX.lineWidth=2.5;
+    CX.shadowColor='#e040fb';CX.shadowBlur=12;
+    CX.beginPath();CX.arc(x,y,sz+7,0,P2);CX.stroke();
+    CX.shadowBlur=0;
+  }
   try{c.d.draw(x,y,c.t,c.st,c.dir);}catch(e){}
   var bw=sz*2.2,top=y-sz-9;
   CX.fillStyle='rgba(0,0,0,0.65)';CX.fillRect(x-bw/2,top,bw,5);
@@ -1788,6 +1977,8 @@ function loop(ts){
     if(G.p.skillCD>0)G.p.skillCD-=dt;
     if(G.a.skillCD>0)G.a.skillCD-=dt;
     updBossCrystal(dt);
+    updPotions(dt);
+    checkFusion();
   }
   var npt=[];for(i=0;i<G.parts.length;i++){var pp=G.parts[i];pp.x+=pp.vx*dt;pp.y+=pp.vy*dt;pp.vy+=50*dt;pp.life-=dt;if(pp.life>0)npt.push(pp);}G.parts=npt;
   var nd=[];for(i=0;i<G.dmgs.length;i++){var dd=G.dmgs[i];dd.y+=dd.vy*dt;dd.life-=dt;if(dd.life>0)nd.push(dd);}G.dmgs=nd;
@@ -1800,6 +1991,8 @@ function loop(ts){
   for(i=0;i<G.parts.length;i++){var pp2=G.parts[i];var al=C01(pp2.life/pp2.ml);CX.globalAlpha=al;CX.fillStyle=pp2.col;CX.beginPath();CX.arc(pp2.x,pp2.y,pp2.r*al,0,P2);CX.fill();}CX.globalAlpha=1;
   for(i=0;i<G.crystals.length;i++)drawCrystal(G.crystals[i]);
   drawBossCrystal();
+  drawPotions();
+  drawFusionIndicators();
   for(i=0;i<G.p.cs.length;i++)drawCreature(G.p.cs[i]);
   for(i=0;i<G.a.cs.length;i++)drawCreature(G.a.cs[i]);
   drawOwner(G.p);drawOwner(G.a);
