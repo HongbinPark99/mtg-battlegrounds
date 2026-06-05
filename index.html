@@ -87,6 +87,19 @@ canvas{position:fixed;top:0;left:0;}
 /* 특성 태그들 */
 .cs-traits{display:flex;flex-wrap:wrap;gap:2px;padding:2px 3px 3px;justify-content:center;}
 .cs-tag{font-size:7px;font-weight:700;border-radius:3px;padding:1px 4px;letter-spacing:0.5px;white-space:nowrap;}
+/* SKILL BAR */
+#skillbar{position:fixed;bottom:152px;right:10px;display:none;flex-direction:column;gap:5px;z-index:10;}
+.sk{width:88px;height:52px;border-radius:7px;border:2px solid rgba(255,255,255,.1);background:rgba(6,6,20,.95);display:flex;flex-direction:row;align-items:center;gap:6px;padding:0 7px;cursor:pointer;position:relative;flex-shrink:0;transition:border-color .12s;}
+.sk.sk-ready{border-color:rgba(224,64,251,.5);}
+.sk.sk-ready:hover{border-color:#e040fb;box-shadow:0 0 10px rgba(224,64,251,.35);transform:translateX(-2px);}
+.sk.sk-cd{opacity:.45;}
+.sk-icon{font-size:20px;flex-shrink:0;}
+.sk-info{display:flex;flex-direction:column;flex:1;min-width:0;}
+.sk-name{font-size:7px;font-weight:700;color:#e8d5b7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sk-key{font-size:9px;color:#c9a227;font-family:monospace;font-weight:900;}
+.sk-mana{font-size:8px;color:#00e5ff;}
+.sk-cdbar{position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 5px 5px;background:rgba(255,255,255,.06);}
+.sk-cdfill{height:100%;border-radius:0 0 5px 5px;background:linear-gradient(90deg,#e040fb,#9c27b0);transition:width .1s;}
 /* MSG / WARN */
 #msg{position:fixed;top:76px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);border:1px solid rgba(201,162,39,.4);border-radius:4px;padding:6px 18px;font-size:12px;color:#c9a227;pointer-events:none;opacity:0;transition:opacity .3s;z-index:20;white-space:nowrap;}
 #warn{position:fixed;top:44%;left:50%;transform:translate(-50%,-50%);font-size:15px;font-weight:700;letter-spacing:3px;color:#e74c3c;pointer-events:none;opacity:0;transition:opacity .2s;z-index:20;}
@@ -128,13 +141,27 @@ canvas{position:fixed;top:0;left:0;}
 
 <!-- DECK SELECT -->
 <div class="screen" id="scDeck">
-  <div class="deck-title">크리처 선택</div>
-  <div class="deck-sub">전투에 사용할 크리처 4마리를 선택하세요</div>
-  <div class="deck-grid" id="deckGrid"></div>
-  <div style="margin-top:18px;display:flex;gap:10px;align-items:center;">
-    <button class="mbtn sec" onclick="showScreen('scMenu')">뒤로</button>
-    <button class="mbtn" id="deckConfirm" onclick="confirmDeck()" style="opacity:.4;pointer-events:none;">전투 시작!</button>
-    <span id="deckCount" style="color:#555;font-size:11px;font-family:monospace;">0 / 4 선택</span>
+  <!-- Step 1: 크리처 선택 -->
+  <div id="stepCreature">
+    <div class="deck-title">크리처 선택</div>
+    <div class="deck-sub">전투에 사용할 크리처 4마리를 선택하세요</div>
+    <div class="deck-grid" id="deckGrid"></div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+      <button class="mbtn sec" onclick="showScreen('scMenu')">뒤로</button>
+      <button class="mbtn" id="deckConfirm" onclick="goToSkillSelect()" style="opacity:.4;pointer-events:none;">다음: 스킬 선택 →</button>
+      <span id="deckCount" style="color:#555;font-size:11px;font-family:monospace;">0 / 4 선택</span>
+    </div>
+  </div>
+  <!-- Step 2: 스킬 선택 -->
+  <div id="stepSkill" style="display:none;">
+    <div class="deck-title" style="color:#e040fb;">스킬 선택</div>
+    <div class="deck-sub">전투에 사용할 스킬 4개를 선택하세요 (마나 소모)</div>
+    <div class="deck-grid" id="skillGrid" style="grid-template-columns:repeat(3,1fr);max-width:860px;gap:10px;"></div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+      <button class="mbtn sec" onclick="backToCreature()">← 크리처 재선택</button>
+      <button class="mbtn" id="skillConfirm" onclick="confirmDeck()" style="opacity:.4;pointer-events:none;">전투 시작!</button>
+      <span id="skillCount" style="color:#555;font-size:11px;font-family:monospace;">0 / 4 선택</span>
+    </div>
   </div>
 </div>
 
@@ -178,7 +205,7 @@ canvas{position:fixed;top:0;left:0;}
     <div id="pop-hud" style="font-size:11px;color:#aaa;letter-spacing:1px;margin-top:2px;">인구 <span id="pop-cur">0</span>/<span id="pop-max">10</span></div>
     <div class="pbarw"><div class="pbarf" id="p-press"></div></div>
     <div id="fusion-hud" style="display:none;margin-top:4px;font-size:10px;color:#e040fb;letter-spacing:1px;text-align:center;">
-      🧪 합성 물약 <span id="fusion-count">0</span>개 보유 &nbsp;|&nbsp; <span id="fusion-hint" style="color:#aaa;"></span>
+      ⚗ 합성 <span id="fusion-count" style="font-family:monospace;">준비</span> &nbsp;|&nbsp; <span id="fusion-hint" style="color:#444;">같은 크리처 2마리 소환</span>
     </div>
   </div>
   <div class="hside" style="align-items:flex-end;">
@@ -199,6 +226,7 @@ canvas{position:fixed;top:0;left:0;}
 
 
 <div id="cardbar"></div>
+<div id="skillbar"></div>
 <div id="msg"></div>
 <div id="warn">!! 중앙선 침범 - 피해 발생 !!</div>
 <div id="gover">
@@ -631,7 +659,128 @@ var ALL_DEFS={
 //  DECK PRESETS 
 var selectedDeck=null;
 var customSelected=[];
+var customSkillSelected=[];  // 선택된 스킬 키
+var PLAYER_SKILLS=[];        // 인게임 스킬 목록
 var gameMode='solo';
+
+// ══ 스킬 정의 9개 ══
+var ALL_SKILLS={
+  timewarp:{
+    nm:'시간 왜곡', icon:'⏳', mana:4, cd:0,
+    desc:'8초간 내 크리처 속도 2배\n상대 크리처 속도 절반',
+    col:'#1565c0',
+    exec:function(p,a){
+      for(var i=0;i<p.cs.length;i++)if(p.cs[i].alive){p.cs[i]._spdbuf=p.cs[i].spd;p.cs[i].spd*=2;p.cs[i]._spdT=8;}
+      for(var j=0;j<a.cs.length;j++)if(a.cs[j].alive){a.cs[j]._spdbuf=a.cs[j].spd;a.cs[j].spd*=0.5;a.cs[j]._spdT=8;}
+      showMsg('⏳ 시간 왜곡! 8초간 속도 역전');
+      G.SKILL_FX={type:'timewarp',t:0,cx:p.x,cy:p.y};
+    }
+  },
+  steal:{
+    nm:'크리처 전향', icon:'\uD83C\uDFAD', mana:5, cd:0,
+    desc:'상대 크리처 중 가장 약한\n1마리를 내 편으로 전향',
+    col:'#6a1b9a',
+    exec:function(p,a){
+      var weak=null,wmin=9999;
+      for(var i=0;i<a.cs.length;i++){if(a.cs[i].alive&&a.cs[i].hp<wmin){wmin=a.cs[i].hp;weak=a.cs[i];}}
+      if(!weak){showMsg('전향할 크리처 없음');p.mana+=5;return;}
+      weak.own='p';weak.dir=p.dir||1;
+      spawnFx(weak.x,weak.y,'#e040fb',20,100);
+      showMsg('\uD83C\uDFAD '+weak.d.nm+' 전향 성공!');
+      G.SKILL_FX={type:'steal',t:0,cx:weak.x,cy:weak.y};
+    }
+  },
+  fortress:{
+    nm:'요새화', icon:'\uD83C\uDFF0', mana:3, cd:0,
+    desc:'15초간 내 진영에 보호막\n진입한 내 크리처 HP 회복',
+    col:'#2e7d32',
+    exec:function(p,a){
+      G.fortress={t:15,own:p.isP?'p':'a'};
+      showMsg('\uD83C\uDFF0 요새화! 15초간 내 진영 강화');
+      G.SKILL_FX={type:'blast',t:0,cx:p.x,cy:p.y,r:200};
+    }
+  },
+  manaflood:{
+    nm:'마나 과부하', icon:'\uD83D\uDCA7', mana:2, cd:0,
+    desc:'6초간 마나 재생 5배\n이후 4초 마나 차단',
+    col:'#0277bd',
+    exec:function(p,a){
+      G.manaflood={t:6,owner:p,phase:'boost'};
+      showMsg('\uD83D\uDCA7 마나 과부하! 6초간 마나 5배');
+      G.SKILL_FX={type:'heal',t:0,cx:p.x,cy:p.y};
+    }
+  },
+  summonflood:{
+    nm:'소환 폭풍', icon:'\uD83C\uDF00', mana:6, cd:0,
+    desc:'덱 전체를 마나 무시하고\n즉시 소환 (인구수 허용 범위)',
+    col:'#00838f',
+    exec:function(p,a){
+      var deck=p.isP?PLAYER_DECK:AI_DECK;
+      for(var i=0;i<deck.length;i++){
+        var d2=ALL_DEFS[deck[i]];if(!d2)continue;
+        if(getPop(p)+( d2.pop||1)>POP_MAX)continue;
+        var om=p.mana;p.mana=d2.mana;
+        summon(p,deck[i]);
+        p.mana=om;
+      }
+      showMsg('\uD83C\uDF00 소환 폭풍! 덱 전체 즉시 소환');
+      G.SKILL_FX={type:'blast',t:0,cx:p.x,cy:p.y,r:150};
+    }
+  },
+  bloodpact:{
+    nm:'피의 계약', icon:'\uD83E\uDE78', mana:3, cd:0,
+    desc:'내 HP 4 소모 대신\n모든 크리처 공격력 +3 (10초)',
+    col:'#b71c1c',
+    exec:function(p,a){
+      p.hp-=4;if(p.hp<1)p.hp=1;
+      for(var i=0;i<p.cs.length;i++)if(p.cs[i].alive){p.cs[i].pow+=3;p.cs[i]._powT=10;}
+      spawnFx(p.x,p.y,'#e74c3c',20,90);
+      showMsg('\uD83E\uDE78 피의 계약! HP-4 크리처 공격+3');
+      G.SKILL_FX={type:'lightning',t:0,cx:p.x,cy:p.y,targets:p.cs.filter(function(c){return c.alive;}).map(function(c){return{x:c.x,y:c.y};})};
+    }
+  },
+  quake:{
+    nm:'대지진', icon:'\uD83C\uDF0B', mana:5, cd:0,
+    desc:'맵 전체 크리처에 3 피해\n(아군 포함)',
+    col:'#4e342e',
+    exec:function(p,a){
+      var all=p.cs.concat(a.cs);
+      for(var i=0;i<all.length;i++){
+        if(!all[i].alive)continue;
+        all[i].hp-=3;spawnFx(all[i].x,all[i].y,'#ff8f00',8,70);
+        spawnDmg(all[i].x,all[i].y,'-3',all[i].own);
+      }
+      G.shake=0.5;showMsg('\uD83C\uDF0B 대지진! 전체 3피해');
+      G.SKILL_FX={type:'blast',t:0,cx:innerWidth/2,cy:ATOP+AH()/2,r:300};
+    }
+  },
+  shield_wall:{
+    nm:'방어벽', icon:'\uD83D\uDEE1', mana:3, cd:0,
+    desc:'내 모든 크리처에\n방어막 부여',
+    col:'#006064',
+    exec:function(p,a){
+      var cnt=0;
+      for(var i=0;i<p.cs.length;i++)if(p.cs[i].alive){p.cs[i].shieldUp=true;cnt++;}
+      spawnFx(p.x,p.y,'#00bcd4',18,80);
+      showMsg('\uD83D\uDEE1 방어벽! '+cnt+'마리에 방어막 부여');
+      G.SKILL_FX={type:'heal',t:0,cx:p.x,cy:p.y};
+    }
+  },
+  execute:{
+    nm:'처형', icon:'\u2694', mana:4, cd:0,
+    desc:'HP 30% 이하 적 크리처\n전부 즉시 처치',
+    col:'#b71c1c',
+    exec:function(p,a){
+      var cnt=0;
+      for(var i=0;i<a.cs.length;i++){
+        var c=a.cs[i];if(!c.alive)continue;
+        if(c.hp/c.mhp<=0.3){c.hp=-1;spawnFx(c.x,c.y,'#e74c3c',12,90);cnt++;}
+      }
+      G.shake=0.3;showMsg('\u2694 처형! '+cnt+'마리 즉시 처치');
+      G.SKILL_FX={type:'lightning',t:0,cx:p.x,cy:p.y,targets:a.cs.filter(function(c){return c.hp<=0;}).map(function(c){return{x:c.x,y:c.y};})};
+    }
+  }
+};
 
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
@@ -641,11 +790,75 @@ function showScreen(id){
 function goToDeck(mode){
   gameMode=mode;
   customSelected=[];
+  customSkillSelected=[];
   selectedDeck=null;
   buildDeckUI();
+  // 크리처 선택 화면으로
+  document.getElementById('stepCreature').style.display='block';
+  document.getElementById('stepSkill').style.display='none';
   showScreen('scDeck');
 }
 function goToMulti(){goToMultiScreen();}
+
+function goToSkillSelect(){
+  if(customSelected.length!==4)return;
+  selectedDeck={id:'custom',cards:customSelected.slice()};
+  customSkillSelected=[];
+  buildSkillUI();
+  document.getElementById('stepCreature').style.display='none';
+  document.getElementById('stepSkill').style.display='block';
+}
+function backToCreature(){
+  document.getElementById('stepCreature').style.display='block';
+  document.getElementById('stepSkill').style.display='none';
+}
+
+function buildSkillUI(){
+  var grid=document.getElementById('skillGrid');
+  grid.innerHTML='';
+  Object.keys(ALL_SKILLS).forEach(function(k){
+    var s=ALL_SKILLS[k];
+    var card=document.createElement('div');
+    card.className='deck-card';card.id='skcard_'+k;
+    card.innerHTML=
+      '<div style="position:absolute;top:7px;left:8px;background:#e040fb22;color:#e040fb;border:1px solid #e040fb44;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;font-family:monospace;" title="마나 비용">'+s.mana+'</div>'
+      +'<div style="font-size:28px;margin-top:22px;text-align:center;">'+s.icon+'</div>'
+      +'<div style="font-size:12px;font-weight:700;color:#e8d5b7;margin-top:4px;text-align:center;">'+s.nm+'</div>'
+      +'<div style="font-size:9px;color:#888;line-height:1.5;margin-top:4px;text-align:center;white-space:pre-line;">'+s.desc+'</div>'
+      +'<div style="margin-top:6px;text-align:center;"><span style="font-size:8px;font-weight:700;border-radius:3px;padding:2px 6px;background:'+s.col+'44;color:'+s.col+';border:1px solid '+s.col+'66;">\uD83D\uDCA7마나 '+s.mana+'</span></div>';
+    card.onclick=function(){toggleSkill(k);};
+    grid.appendChild(card);
+  });
+  updateSkillConfirm();
+}
+
+function toggleSkill(key){
+  var idx=customSkillSelected.indexOf(key);
+  if(idx>=0){
+    customSkillSelected.splice(idx,1);
+  } else {
+    if(customSkillSelected.length>=4){
+      var removed=customSkillSelected.shift();
+      var oldEl=document.getElementById('skcard_'+removed);
+      if(oldEl)oldEl.classList.remove('sel');
+    }
+    customSkillSelected.push(key);
+  }
+  var el=document.getElementById('skcard_'+key);
+  if(el)el.classList.toggle('sel',customSkillSelected.indexOf(key)>=0);
+  updateSkillConfirm();
+}
+
+function updateSkillConfirm(){
+  var cnt=customSkillSelected.length;
+  var btn=document.getElementById('skillConfirm');
+  var sc=document.getElementById('skillCount');
+  if(sc)sc.textContent=cnt+' / 4 선택';
+  if(btn){
+    if(cnt===4){btn.style.opacity='1';btn.style.pointerEvents='auto';}
+    else{btn.style.opacity='0.4';btn.style.pointerEvents='none';}
+  }
+}
 
 // Individual card selection UI - each creature shown as a card, pick 4
 function buildDeckUI(){
@@ -668,8 +881,8 @@ function buildDeckUI(){
     }).join('');
     // 속도 태그
     var spdTag='';
-    if(d.spd>=90)spdTag='<span style="display:inline-block;font-size:7px;font-weight:700;border-radius:3px;padding:1px 5px;background:#1565c0;color:#fff;margin:1px;">💨빠름</span>';
-    else if(d.spd<=55)spdTag='<span style="display:inline-block;font-size:7px;font-weight:700;border-radius:3px;padding:1px 5px;background:#4e342e;color:#ccc;margin:1px;">🐢느림</span>';
+    if(d.spd>=90)spdTag='<span style="display:inline-block;font-size:7px;font-weight:700;border-radius:3px;padding:1px 5px;background:#1565c0;color:#fff;margin:1px;">\uD83D\uDCA8빠름</span>';
+    else if(d.spd<=55)spdTag='<span style="display:inline-block;font-size:7px;font-weight:700;border-radius:3px;padding:1px 5px;background:#4e342e;color:#ccc;margin:1px;">\uD83D\uDC22느림</span>';
     tagHtml2+=spdTag;
 
     var traitDesc={
@@ -682,14 +895,14 @@ function buildDeckUI(){
     card.innerHTML=
       // 마나 + 인구수 (좌상단/우상단)
       '<div style="position:absolute;top:7px;left:8px;background:#c9a22733;color:#c9a227;border:1px solid #c9a22755;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;font-family:monospace;" title="마나 비용">'+d.mana+'</div>'
-      +'<div style="position:absolute;top:7px;right:8px;font-size:9px;color:#777;" title="인구 소모">👥'+(d.pop||1)+'</div>'
+      +'<div style="position:absolute;top:7px;right:8px;font-size:9px;color:#777;" title="인구 소모">\uD83D\uDC65'+(d.pop||1)+'</div>'
       // 아트
       +'<canvas id="cvcard_'+k+'" width="56" height="48" style="margin-top:22px;border-radius:5px;background:rgba(0,0,0,0.4);display:block;margin-left:auto;margin-right:auto;"></canvas>'
       // 이름 + 스탯
       +'<div style="font-size:12px;font-weight:700;color:#e8d5b7;margin-top:4px;text-align:center;">'+d.nm+'</div>'
       +'<div style="display:flex;justify-content:center;gap:10px;font-family:monospace;margin:2px 0;">'
-        +'<span style="font-size:12px;font-weight:900;color:#e74c3c;" title="공격력">⚔'+d.pow+'</span>'
-        +'<span style="font-size:12px;font-weight:900;color:#27ae60;" title="체력">❤'+d.hp+'</span>'
+        +'<span style="font-size:12px;font-weight:900;color:#e74c3c;" title="공격력">\u2694'+d.pow+'</span>'
+        +'<span style="font-size:12px;font-weight:900;color:#27ae60;" title="체력">\u2764'+d.hp+'</span>'
       +'</div>'
       // 특성 태그들
       +'<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin:3px 0;">'+tagHtml2+'</div>'
@@ -756,20 +969,29 @@ function updateDeckConfirm(){
 
 function confirmDeck(){
   if(!selectedDeck||selectedDeck.cards.length!==4)return;
+  if(customSkillSelected.length!==4){showMsg('스킬 4개를 선택해주세요!');return;}
+  selectedDeck.skills=customSkillSelected.slice();
   if(gameMode==='multi'){
     MY_DECK_CARDS=selectedDeck.cards;
-    peerSend({type:'deck',cards:selectedDeck.cards});
-    // 대기 화면 표시
+    peerSend({type:'deck',cards:selectedDeck.cards,skills:selectedDeck.skills});
     showScreen('scDeck');
-    var btn=document.getElementById('deckConfirm');
+    document.getElementById('stepSkill').style.display='block';
+    document.getElementById('stepCreature').style.display='none';
+    var btn=document.getElementById('skillConfirm');
     if(btn){btn.textContent='상대방 대기 중...';btn.style.opacity='0.5';btn.style.pointerEvents='none';}
     if(REMOTE_DECK){startMultiGame();}
     return;
   }
-  startGame(selectedDeck.cards, aiPickDeck());
+  startGame(selectedDeck.cards, aiPickDeck(), selectedDeck.skills, aiPickSkills());
 }
 function aiPickDeck(){
   var all=Object.keys(ALL_DEFS);
+  var pick=[];
+  while(pick.length<4){var k=all[Math.floor(Math.random()*all.length)];if(pick.indexOf(k)<0)pick.push(k);}
+  return pick;
+}
+function aiPickSkills(){
+  var all=Object.keys(ALL_SKILLS);
   var pick=[];
   while(pick.length<4){var k=all[Math.floor(Math.random()*all.length)];if(pick.indexOf(k)<0)pick.push(k);}
   return pick;
@@ -948,9 +1170,10 @@ function peerSend(obj){
 function onPeerMsg(msg){
   if(msg.type==='deck'){
     REMOTE_DECK=msg.cards;
+    if(msg.skills)AI_SKILLS=msg.skills;
     if(MY_DECK_CARDS){startMultiGame();}
     else{
-      var btn=document.getElementById('deckConfirm');
+      var btn=document.getElementById('skillConfirm');
       if(btn&&btn.textContent!=='상대방 대기 중...'){
         btn.textContent='상대방 준비완료! 시작하기';
         btn.style.opacity='1';btn.style.pointerEvents='auto';
@@ -960,11 +1183,10 @@ function onPeerMsg(msg){
     if(multiRole==='host'&&G){
       if(msg.summon){summon(G.a,msg.summon);}
       if(msg.slash){remoteSlash();}
-      if(msg.skill){remoteSkill();}
+      if(msg.skill){var rs=ALL_SKILLS[msg.skill];if(rs){G.a.mana=Math.max(0,G.a.mana-rs.mana);rs.exec(G.a,G.p);}}
       if(msg.x!==undefined){G.a.x=msg.x;G.a.y=msg.y;}
     }
   } else if(msg.type==='fullstate'){
-    // host가 보낸 전체 상태를 guest가 받아서 화면에 표시
     if(multiRole==='guest'&&G){applyFullState(msg);}
   }
 }
@@ -1032,9 +1254,8 @@ function buildFullStateMsg(){
 
 function startMultiGame(){
   if(!MY_DECK_CARDS||!REMOTE_DECK)return;
-  // host: G.p=나(왼쪽), G.a=상대(오른쪽)
-  // guest: G.p=나(오른쪽), G.a=상대(왼쪽) → startGame에서 설정
-  startGame(MY_DECK_CARDS,REMOTE_DECK);
+  var mySkills=PLAYER_SKILLS.length?PLAYER_SKILLS:(customSkillSelected.length?customSkillSelected:aiPickSkills());
+  startGame(MY_DECK_CARDS,REMOTE_DECK,mySkills,AI_SKILLS.length?AI_SKILLS:aiPickSkills());
 }
 
 //  GAME CONSTANTS 
@@ -1049,40 +1270,143 @@ function AH(){return innerHeight-ATOP-ABOT;}
 function C01(v){return v<0?0:v>1?1:v;}
 
 //  START GAME 
-function startGame(pCards,aCards){
+var AI_SKILLS=[];
+function startGame(pCards,aCards,pSkills,aSkills){
   PLAYER_DECK=pCards.slice();AI_DECK=aCards.slice();
+  PLAYER_SKILLS=(pSkills||[]).slice();
+  AI_SKILLS=(aSkills||[]).slice();
   MY_DECK_CARDS=null;REMOTE_DECK=null;
   showScreen('');
   document.getElementById('hud').style.display='flex';
   document.getElementById('cardbar').style.display='flex';
+  document.getElementById('skillbar').style.display='flex';
   document.getElementById('slash-hud').style.display='flex';
   document.getElementById('gover').style.display='none';
   RUN=true;GT=0;KEYS={};LT=0;SLASH_CD=0;SLASH_ANIM=0;
   var my=ATOP+AH()*0.5;
-  // 멀티: host=항상 왼쪽(G.p), guest=항상 오른쪽(G.p)
-  // 양쪽 모두 G.p가 자신, G.a가 상대
-  // host: G.p 왼쪽(x=90,dir=1), G.a 오른쪽(x=W-90,dir=-1)
-  // guest: G.p 오른쪽(x=W-90,dir=-1), G.a 왼쪽(x=90,dir=1)
   var isGuest=(gameMode==='multi'&&multiRole==='guest');
   var W=innerWidth;
-  var px=isGuest?W-90:90,   pd=isGuest?-1:1;
-  var ax=isGuest?90:W-90,   ad=isGuest?1:-1;
+  var px=isGuest?W-90:90,pd=isGuest?-1:1;
+  var ax=isGuest?90:W-90,ad=isGuest?1:-1;
   G={
     p:{isP:true, x:px,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:pd,kills:0,lv:1,skillCD:0},
     a:{isP:false,x:ax,y:my,hp:20,mhp:20,mana:3,mmana:MMAX,cs:[],pt:0,dir:ad,kills:0,lv:1,skillCD:0},
     aiT:1.8,parts:[],dmgs:[],shake:0,crystals:[],cTimer:8,bossCrystal:null,bossCTimer:20,
-    potions:[],potionTimer:18,  // 합성 물약
-    fusionPotions:0             // 플레이어 보유 물약 수
+    potions:[],potionTimer:18,fusionPotions:0,
+    skillCDs:{},   // 스킬별 쿨타임 {key: remainSec}
+    fusionCD:0     // 합성 쿨타임
   };
+  // 스킬 쿨타임 초기화
+  PLAYER_SKILLS.forEach(function(k){G.skillCDs[k]=0;});
   buildCardBar(PLAYER_DECK);
+  buildSkillBar(PLAYER_SKILLS);
   spawnCrystal(false,0,0);spawnCrystal(false,0,0);
-  // 모바일 UI 표시
   if(!window._RL){window._RL=true;requestAnimationFrame(loop);}
 }
 
 function restartGame(){
   document.getElementById('gover').style.display='none';
-  startGame(PLAYER_DECK,AI_DECK);
+  startGame(PLAYER_DECK,AI_DECK,PLAYER_SKILLS,AI_SKILLS);
+}
+
+var SKKEYS=['1','2','3','4'];
+
+function buildSkillBar(skills){
+  var bar=document.getElementById('skillbar');
+  if(!bar)return;
+  bar.innerHTML='';
+  for(var i=0;i<4;i++){
+    var k=skills[i],s=ALL_SKILLS[k];if(!s)continue;
+    var sl=document.createElement('div');
+    sl.className='sk';sl.id='sk'+i;
+    sl.setAttribute('data-idx',i);
+    sl.onclick=(function(idx){return function(){useSkill(idx);};})(i);
+    sl.innerHTML=
+      '<div class="sk-icon">'+s.icon+'</div>'
+      +'<div class="sk-info">'
+        +'<div class="sk-name">'+s.nm+'</div>'
+        +'<div class="sk-key">['+SKKEYS[i]+'] <span class="sk-mana">\uD83D\uDCA7'+s.mana+'</span></div>'
+      +'</div>'
+      +'<div class="sk-cdbar"><div class="sk-cdfill" id="skfill'+i+'" style="width:100%"></div></div>';
+    bar.appendChild(sl);
+  }
+}
+
+var SKILL_CD_MAX=30; // 스킬 공통 쿨타임 30초
+
+function useSkill(idx){
+  if(!G||!RUN)return;
+  var k=PLAYER_SKILLS[idx];
+  var s=ALL_SKILLS[k];
+  if(!s)return;
+  // 쿨타임 체크
+  if((G.skillCDs[k]||0)>0){showMsg(s.nm+' 쿨타임: '+Math.ceil(G.skillCDs[k])+'초');return;}
+  // 마나 체크
+  if(G.p.mana<s.mana){showMsg(s.icon+' 마나 부족! (필요: '+s.mana+')');return;}
+  G.p.mana-=s.mana;
+  G.skillCDs[k]=SKILL_CD_MAX;
+  s.exec(G.p,G.a);
+  if(gameMode==='multi')peerSend({type:'input',skill:k});
+}
+
+function updSkillBar(dt){
+  if(!G)return;
+  PLAYER_SKILLS.forEach(function(k,i){
+    if(!G.skillCDs[k])G.skillCDs[k]=0;
+    if(G.skillCDs[k]>0)G.skillCDs[k]-=dt;
+    var cd=G.skillCDs[k];
+    var sl=document.getElementById('sk'+i);
+    var fill=document.getElementById('skfill'+i);
+    if(!sl||!fill)return;
+    var rdy=cd<=0;
+    sl.className='sk '+(rdy?'sk-ready':'sk-cd');
+    fill.style.width=(rdy?100:C01(1-cd/SKILL_CD_MAX)*100)+'%';
+    // 쿨타임 텍스트
+    var info=sl.querySelector('.sk-key');
+    if(info){
+      var s=ALL_SKILLS[k];
+      info.innerHTML='['+SKKEYS[i]+'] '+(rdy?'<span class="sk-mana">\uD83D\uDCA7'+(s?s.mana:0)+'</span>':'<span style="color:#e74c3c;">'+Math.ceil(cd)+'초</span>');
+    }
+  });
+  // 시간 왜곡, 마나 과부하 등 지속 효과 처리
+  updSkillEffects(dt);
+}
+
+function updSkillEffects(dt){
+  if(!G)return;
+  // 시간 왜곡 - 크리처 속도 복원
+  var allCs=G.p.cs.concat(G.a.cs);
+  for(var i=0;i<allCs.length;i++){
+    var c=allCs[i];
+    if(c._spdT>0){c._spdT-=dt;if(c._spdT<=0){c.spd=c._spdbuf||c.d.spd||60;}}
+    if(c._powT>0){c._powT-=dt;if(c._powT<=0){c.pow=c.d.pow;}}
+  }
+  // 마나 과부하
+  if(G.manaflood){
+    G.manaflood.t-=dt;
+    if(G.manaflood.t<=0){
+      if(G.manaflood.phase==='boost'){
+        G.manaflood.phase='block';G.manaflood.t=4;
+        showMsg('\uD83D\uDCA7 마나 과부하 종료! 4초간 마나 차단');
+      } else {
+        G.manaflood=null;
+      }
+    }
+  }
+  // 요새화 - 내 진영 크리처 HP 회복
+  if(G.fortress){
+    G.fortress.t-=dt;
+    if(G.fortress.t<=0){G.fortress=null;return;}
+    var own=G.fortress.own;
+    var fCs=own==='p'?G.p.cs:G.a.cs;
+    var half=own==='p'?(G.p.dir>0?0:innerWidth/2):(G.a.dir>0?0:innerWidth/2);
+    for(var j=0;j<fCs.length;j++){
+      var fc=fCs[j];if(!fc.alive)continue;
+      if((own==='p'&&fc.x<innerWidth/2)||(own==='a'&&fc.x>innerWidth/2)){
+        fc.hp=Math.min(fc.mhp,fc.hp+0.8*dt);
+      }
+    }
+  }
 }
 
 //  CARD BAR 
@@ -1090,13 +1414,13 @@ var HKEYS=['h','j','k','l'];
 
 // 특성별 태그 정의
 var TRAIT_TAGS={
-  first:  [{label:'⚡선제공격',bg:'#b71c1c',fg:'#fff',tip:'첫 타격 우선'}],
-  haste:  [{label:'💨신속',    bg:'#1565c0',fg:'#fff',tip:'빠른 이동·공격'}],
-  tough:  [{label:'🛡강인함',  bg:'#4e342e',fg:'#fff',tip:'매 턴 HP 소량 회복'}],
-  shield: [{label:'🔵방어막',  bg:'#006064',fg:'#fff',tip:'첫 피해 1회 무효'}],
-  lifesteal:[{label:'🩸흡혈',  bg:'#4a148c',fg:'#fff',tip:'딜의 50% 체력 회복'}],
-  aoe:    [{label:'🔥광역',    bg:'#bf360c',fg:'#fff',tip:'주변 적에 추가 피해'}],
-  berserk:[{label:'⚔광전사',  bg:'#e65100',fg:'#fff',tip:'공격속도 빠름'}]
+  first:  [{label:'[선제]선제공격',bg:'#b71c1c',fg:'#fff',tip:'첫 타격 우선'}],
+  haste:  [{label:'[신속]신속',    bg:'#1565c0',fg:'#fff',tip:'빠른 이동·공격'}],
+  tough:  [{label:'[강인]강인함',  bg:'#4e342e',fg:'#fff',tip:'매 턴 HP 소량 회복'}],
+  shield: [{label:'[막기]방어막',  bg:'#006064',fg:'#fff',tip:'첫 피해 1회 무효'}],
+  lifesteal:[{label:'[흡혈]흡혈',  bg:'#4a148c',fg:'#fff',tip:'딜의 50% 체력 회복'}],
+  aoe:    [{label:'[광역]광역',    bg:'#bf360c',fg:'#fff',tip:'주변 적에 추가 피해'}],
+  berserk:[{label:'[광전]광전사',  bg:'#e65100',fg:'#fff',tip:'공격속도 빠름'}]
 };
 
 function buildCardBar(cards){
@@ -1107,8 +1431,8 @@ function buildCardBar(cards){
 
     // 속도 등급
     var spdLabel='';
-    if(d.spd>=90)spdLabel='<span class="cs-tag" style="background:rgba(21,101,192,.7);color:#fff">💨빠름</span>';
-    else if(d.spd<=55)spdLabel='<span class="cs-tag" style="background:rgba(78,52,46,.7);color:#ccc">🐢느림</span>';
+    if(d.spd>=90)spdLabel='<span class="cs-tag" style="background:rgba(21,101,192,.7);color:#fff">\uD83D\uDCA8빠름</span>';
+    else if(d.spd<=55)spdLabel='<span class="cs-tag" style="background:rgba(78,52,46,.7);color:#ccc">\uD83D\uDC22느림</span>';
 
     // 특성 태그 HTML
     var tagHtml=tags.map(function(t){
@@ -1130,13 +1454,13 @@ function buildCardBar(cards){
       +'<div class="cs-art"><canvas id="cpv'+i+'" width="56" height="38"></canvas></div>'
       // 이름
       +'<div class="cs-name">'+d.nm+'</div>'
-      // 스탯: 공격⚔ / 체력❤ / 인구👥
+      // 스탯: 공격\u2694 / 체력\u2764 / 인구\uD83D\uDC65
       +'<div class="cs-stats">'
-        +'<span class="cs-pow" title="공격력">⚔'+d.pow+'</span>'
+        +'<span class="cs-pow" title="공격력">\u2694'+d.pow+'</span>'
         +'<span style="color:#444;font-size:9px;">|</span>'
-        +'<span class="cs-hp" title="체력">❤'+d.hp+'</span>'
+        +'<span class="cs-hp" title="체력">\u2764'+d.hp+'</span>'
         +'<span style="color:#444;font-size:9px;">|</span>'
-        +'<span class="cs-pop" title="인구 소모">👥'+(d.pop||1)+'</span>'
+        +'<span class="cs-pop" title="인구 소모">\uD83D\uDC65'+(d.pop||1)+'</span>'
       +'</div>'
       // 특성 태그
       +'<div class="cs-traits">'+tagHtml+'</div>';
@@ -1184,7 +1508,7 @@ function summon(owner,key){
   var curPop=getPop(owner);
   var cost=d.pop||1;
   if(curPop+cost>POP_MAX){
-    if(owner.isP)showMsg('⚠ 인구 한도 초과! ('+curPop+'/'+POP_MAX+')');return;
+    if(owner.isP)showMsg('\u26A0 인구 한도 초과! ('+curPop+'/'+POP_MAX+')');return;
   }
   owner.mana-=d.mana;
   var sd=owner.isP?1:-1,sx=owner.x+sd*44,sy=owner.y+(Math.random()-0.5)*80;
@@ -1396,7 +1720,7 @@ function updBossCrystal(dt){
     // 맵 중앙에 보스 크리스탈 등장
     G.bossCrystal={x:innerWidth/2,y:ATOP+AH()*0.5,life:15,t:0,val:3};
     G.bossCTimer=30+Math.random()*20;
-    showMsg('💎 파워 크리스탈 등장!');
+    showMsg('\uD83D\uDC8E 파워 크리스탈 등장!');
   }
   if(!G.bossCrystal)return;
   G.bossCrystal.t+=dt;
@@ -1408,7 +1732,7 @@ function updBossCrystal(dt){
   if(dpx*dpx+dpy*dpy<30*30){
     G.p.mana=Math.min(G.p.mana+bc.val,G.p.mmana);
     spawnFx(bc.x,bc.y,'#ff6f00',25,120);
-    showMsg('💎 파워 크리스탈 획득! 마나 +'+bc.val);
+    showMsg('\uD83D\uDC8E 파워 크리스탈 획득! 마나 +'+bc.val);
     // 강력한 크리처 즉시 소환
     var powerCards=['dragon','angel','berserker'];
     for(var pi=0;pi<powerCards.length;pi++){
@@ -1434,10 +1758,94 @@ function updBossCrystal(dt){
 //  합성 물약 시스템
 // ══════════════════════════════════════════
 var FUSION_RANGE=90;
+var FUSION_PAIRS=[];
+var FUSION_CD_MAX=30;
+
+function checkFusion(){
+  if(!G){FUSION_PAIRS=[];return;}
+  FUSION_PAIRS=[];
+  var cs=G.p.cs;
+  for(var i=0;i<cs.length;i++){
+    for(var j=i+1;j<cs.length;j++){
+      if(!cs[i].alive||!cs[j].alive)continue;
+      if(cs[i].key!==cs[j].key)continue;
+      if(cs[i].fused||cs[j].fused)continue;
+      var mx=(cs[i].x+cs[j].x)/2;
+      var my2=(cs[i].y+cs[j].y)/2;
+      FUSION_PAIRS.push({a:cs[i],b:cs[j],mx:mx,my:my2});
+    }
+  }
+  updFusionHUD();
+}
+
+function drawFusionIndicators(){
+  if(!G||FUSION_PAIRS.length===0)return;
+  var cdRdy=G.fusionCD<=0;
+  for(var i=0;i<FUSION_PAIRS.length;i++){
+    var fp=FUSION_PAIRS[i];
+    CX.save();
+    // 두 크리처 연결선
+    CX.strokeStyle=cdRdy?'rgba(224,64,251,0.7)':'rgba(200,200,200,0.25)';
+    CX.lineWidth=2;CX.setLineDash([5,4]);
+    CX.beginPath();CX.moveTo(fp.a.x,fp.a.y);CX.lineTo(fp.b.x,fp.b.y);CX.stroke();
+    CX.setLineDash([]);
+    // 중점 아이콘
+    var pulse=0.6+Math.sin(GT*5)*0.4;
+    CX.globalAlpha=cdRdy?pulse:0.3;
+    CX.font='bold 16px serif';CX.textAlign='center';CX.textBaseline='middle';
+    CX.fillStyle=cdRdy?'#e040fb':'#888';
+    CX.fillText('\u2697',fp.mx,fp.my);
+    // 안내 텍스트
+    if(cdRdy){
+      CX.globalAlpha=1;
+      CX.fillStyle='rgba(0,0,0,0.75)';CX.fillRect(fp.mx-55,fp.my+14,110,18);
+      CX.fillStyle='#e040fb';CX.font='bold 10px Georgia';
+      CX.fillText('[F] 합성!',fp.mx,fp.my+23);
+    } else {
+      CX.globalAlpha=0.5;
+      CX.fillStyle='rgba(0,0,0,0.6)';CX.fillRect(fp.mx-40,fp.my+14,80,16);
+      CX.fillStyle='#888';CX.font='bold 9px Georgia';
+      CX.fillText('합성 쿨타임 '+Math.ceil(G.fusionCD)+'초',fp.mx,fp.my+22);
+    }
+    CX.restore();
+  }
+}
+
+function tryFuse(){
+  if(!G||!RUN){return;}
+  if(G.fusionCD>0){showMsg('합성 쿨타임: '+Math.ceil(G.fusionCD)+'초');return;}
+  if(FUSION_PAIRS.length===0){showMsg('같은 크리처 2마리를 소환하면 합성 가능!');return;}
+  var fp=FUSION_PAIRS[0];
+  var d=ALL_DEFS[fp.a.key];
+  if(!d)return;
+  var cost=d.mana;
+  if(G.p.mana<cost){showMsg('마나 부족! (필요: '+cost+')');return;}
+  G.p.mana-=cost;
+  G.fusionCD=FUSION_CD_MAX;
+  doFuse(fp.a,fp.b);
+}
+
+function updFusionHUD(){
+  var el=document.getElementById('fusion-hud');
+  var cnt=document.getElementById('fusion-count');
+  var hint=document.getElementById('fusion-hint');
+  if(!G||!el)return;
+  el.style.display='block';
+  if(cnt)cnt.textContent=G.fusionCD>0?Math.ceil(G.fusionCD)+'초':'준비';
+  if(cnt)cnt.style.color=G.fusionCD>0?'#888':'#e040fb';
+  if(hint){
+    if(FUSION_PAIRS.length>0&&G.fusionCD<=0){
+      hint.textContent='[F] 합성 가능!';hint.style.color='#e040fb';
+    } else if(FUSION_PAIRS.length>0){
+      hint.textContent='쿨타임 대기 중';hint.style.color='#555';
+    } else {
+      hint.textContent='같은 크리처 2마리 소환';hint.style.color='#444';
+    }
+  }
+}
 
 function updPotions(dt){
   if(!G)return;
-  G.potionTimer-=dt;
   if(G.potionTimer<=0){
     var side=Math.random()<0.5?-1:1;
     var px2=innerWidth/2+side*(80+Math.random()*(innerWidth/2-120));
@@ -1454,7 +1862,7 @@ function updPotions(dt){
     if(dx*dx+dy*dy<28*28){
       G.fusionPotions++;
       spawnFx(pot.x,pot.y,'#e040fb',18,90);
-      showMsg('🧪 합성 물약 획득! (총 '+G.fusionPotions+'개)');
+      showMsg('\uD83E\uDDEA 합성 물약 획득! (총 '+G.fusionPotions+'개)');
       updFusionHUD();
       continue;
     }
@@ -1527,7 +1935,7 @@ function drawFusionIndicators(){
     CX.textAlign='center';CX.textBaseline='middle';
     CX.globalAlpha=pulse;
     CX.fillStyle=fp.playerNear?'#e040fb':'rgba(224,64,251,0.6)';
-    CX.fillText('⚗',fp.mx,fp.my);
+    CX.fillText('\u2697',fp.mx,fp.my);
     if(fp.playerNear){
       var d=ALL_DEFS[fp.a.key];
       var manaCost=d?d.mana:2;
@@ -1541,7 +1949,7 @@ function drawFusionIndicators(){
 }
 
 function tryFuse(){
-  if(!G||G.fusionPotions<=0){showMsg('🧪 합성 물약이 없습니다!');return;}
+  if(!G||G.fusionPotions<=0){showMsg('\uD83E\uDDEA 합성 물약이 없습니다!');return;}
   for(var i=0;i<FUSION_PAIRS.length;i++){
     var fp=FUSION_PAIRS[i];
     if(!fp.playerNear)continue;
@@ -1555,7 +1963,7 @@ function tryFuse(){
     updFusionHUD();
     return;
   }
-  showMsg('⚗ 합성 지점으로 이동 후 [F] 누르기');
+  showMsg('\u2697 합성 지점으로 이동 후 [F] 누르기');
 }
 
 function doFuse(ca,cb){
@@ -1582,7 +1990,7 @@ function doFuse(ca,cb){
   G.p.cs.push(fused);
   spawnFx(mx,my2,'#e040fb',40,160);spawnFx(mx,my2,'#fff',20,100);spawnFx(mx,my2,d.col,20,120);
   G.shake=0.5;
-  showMsg('✨ [합성] '+d.nm+'! HP '+(d.hp*3+5)+' 공격 '+(d.pow*2+3)+' 무적3초 원거리공격!');
+  showMsg('\u2728 [합성] '+d.nm+'! HP '+(d.hp*3+5)+' 공격 '+(d.pow*2+3)+' 무적3초 원거리공격!');
 }
 
 function updFusionHUD(){
@@ -1595,7 +2003,7 @@ function updFusionHUD(){
   if(hint){
     if(G.fusionPotions>0&&FUSION_PAIRS.length>0){
       var any=FUSION_PAIRS.some(function(fp){return fp.playerNear;});
-      hint.textContent=any?'[F] 눌러서 합성!':'⚗ 위치로 이동';
+      hint.textContent=any?'[F] 눌러서 합성!':'\u2697 위치로 이동';
       hint.style.color=any?'#e040fb':'#aaa';
     } else if(G.fusionPotions>0){
       hint.textContent='같은 크리처 2마리 소환';
@@ -1625,7 +2033,7 @@ function drawBossCrystal(){
   CX.closePath();CX.fill();
   CX.globalAlpha=fade;CX.fillStyle='#fff';CX.font='bold 11px Georgia';
   CX.textAlign='center';CX.textBaseline='middle';
-  CX.fillText('💎',bc.x,bc.y);
+  CX.fillText('\uD83D\uDC8E',bc.x,bc.y);
   CX.globalAlpha=1;CX.shadowBlur=0;CX.restore();
 }
 
@@ -1654,7 +2062,7 @@ function remoteSkill(){
 function execSkill(caster,target,type,isPlayer){
   var cx=caster.x,cy=caster.y;
   if(type==='lightning'){
-    // ⚡ 번개 — 상대 모든 크리처에 굵은 번개 선 + 2데미지
+    // \u26A1 번개 — 상대 모든 크리처에 굵은 번개 선 + 2데미지
     for(var i=0;i<target.cs.length;i++){
       var c=target.cs[i];if(!c.alive)continue;
       c.hp-=2;
@@ -1664,16 +2072,16 @@ function execSkill(caster,target,type,isPlayer){
     }
     target.hp-=1;spawnFx(target.x,target.y,'#ffe066',18,120);
     G.SKILL_FX={type:'lightning',t:0,cx:cx,cy:cy,targets:target.cs.filter(function(c){return c.alive;}).map(function(c){return{x:c.x,y:c.y};})};
-    G.shake=0.3;showMsg('⚡ 번개 폭격! 적 전체 2데미지');
+    G.shake=0.3;showMsg('\u26A1 번개 폭격! 적 전체 2데미지');
   } else if(type==='heal'){
-    // 💚 신성 치유 — 플레이어 주변에 초록 원 이펙트 + HP 회복
+    // \uD83D\uDC9A 신성 치유 — 플레이어 주변에 초록 원 이펙트 + HP 회복
     caster.hp=Math.min(caster.hp+6,caster.mhp);
     spawnFx(cx,cy,'#27ae60',28,90);spawnFx(cx,cy,'#a5d6a7',14,60);
     spawnDmg(cx,cy,'+6',isPlayer?'p':'a');
     G.SKILL_FX={type:'heal',t:0,cx:cx,cy:cy};
-    showMsg('💚 신성한 치유! +6 HP');
+    showMsg('\uD83D\uDC9A 신성한 치유! +6 HP');
   } else if(type==='shield_bash'){
-    // 🛡 방패 강타 — 전방 크리처 전체 기절 + 3데미지
+    // \uD83D\uDEE1 방패 강타 — 전방 크리처 전체 기절 + 3데미지
     var dir=caster.dir||1;
     var count=0;
     for(var j=0;j<target.cs.length;j++){
@@ -1685,9 +2093,9 @@ function execSkill(caster,target,type,isPlayer){
       count++;
     }
     G.SKILL_FX={type:'shield_bash',t:0,cx:cx,cy:cy,dir:dir};
-    G.shake=0.35;showMsg('🛡 방패 강타! 전방 '+(count||0)+'마리 기절+3데미지');
+    G.shake=0.35;showMsg('\uD83D\uDEE1 방패 강타! 전방 '+(count||0)+'마리 기절+3데미지');
   } else {
-    // 💥 광역 폭발
+    // \uD83D\uDCA5 광역 폭발
     var pr=130;
     for(var k=0;k<target.cs.length;k++){
       var ec=target.cs[k];if(!ec.alive)continue;
@@ -1695,7 +2103,7 @@ function execSkill(caster,target,type,isPlayer){
       if(dx*dx+dy*dy<pr*pr){ec.hp-=2;spawnFx(ec.x,ec.y,'#e74c3c',8,70);spawnDmg(ec.x,ec.y,'-2',isPlayer?'p':'a');}
     }
     G.SKILL_FX={type:'blast',t:0,cx:cx,cy:cy,r:pr};
-    spawnFx(cx,cy,'#e74c3c',30,160);G.shake=0.35;showMsg('💥 광역 폭발! 반경 내 2데미지');
+    spawnFx(cx,cy,'#e74c3c',30,160);G.shake=0.35;showMsg('\uD83D\uDCA5 광역 폭발! 반경 내 2데미지');
   }
 }
 function drawSkillFx(){
@@ -1776,8 +2184,12 @@ window.addEventListener('keydown',function(e){
   else if(kl==='k')summonAndSend(2);
   else if(kl==='l')summonAndSend(3);
   else if(k===' '){e.preventDefault();playerSlash();}
-  else if(kl==='q'){e.preventDefault();playerSkill();}
+  else if(kl==='q'){e.preventDefault();playerSlash();} // Q도 공격
   else if(kl==='f'){e.preventDefault();tryFuse();}
+  else if(k==='1'){useSkill(0);}
+  else if(k==='2'){useSkill(1);}
+  else if(k==='3'){useSkill(2);}
+  else if(k==='4'){useSkill(3);}
 });
 window.addEventListener('keyup',function(e){
   KEYS[e.key]=false;
@@ -2096,7 +2508,7 @@ function updHUD(){
   var si=document.getElementById('skill-indicator');
   if(si&&G){
     var stype=getSkillType(PLAYER_DECK);
-    var snames={lightning:'⚡ 번개 폭격',heal:'💚 신성 치유',shield_bash:'🛡 방패 강타',blast:'💥 광역 폭발'};
+    var snames={lightning:'\u26A1 번개 폭격',heal:'\uD83D\uDC9A 신성 치유',shield_bash:'\uD83D\uDEE1 방패 강타',blast:'\uD83D\uDCA5 광역 폭발'};
     var srdy=G.p.skillCD<=0;
     si.textContent='[Q] '+(snames[stype]||'스킬')+(srdy?'':' ('+Math.ceil(G.p.skillCD)+'초)');
     si.style.color=srdy?'#e040fb':'#555';
@@ -2120,7 +2532,7 @@ function gameOver(w){
   var el=document.getElementById('gover'),t=document.getElementById('go-title'),s=document.getElementById('go-sub');
   if(w==='p'){t.textContent='승리!';t.style.color='#c9a227';s.textContent='상대방을 물리쳤습니다!';}
   else{t.textContent='패배...';t.style.color='#e74c3c';s.textContent='다른 크리처 조합으로 다시 도전해보세요!';}
-  el.style.display='flex';document.getElementById('cardbar').style.display='none';document.getElementById('slash-hud').style.display='none';
+  el.style.display='flex';document.getElementById('cardbar').style.display='none';document.getElementById('slash-hud').style.display='none';document.getElementById('skillbar').style.display='none';
 }
 function showMsg(txt){var el=document.getElementById('msg');el.textContent=txt;el.style.opacity='1';clearTimeout(MT);MT=setTimeout(function(){el.style.opacity='0';},1600);}
 
@@ -2135,7 +2547,8 @@ function loop(ts){
   if(SLASH_CD>0)SLASH_CD-=dt;if(SLASH_CD<0)SLASH_CD=0;
   if(SLASH_ANIM>0)SLASH_ANIM-=dt;
   moveP(dt);
-  G.p.mana+=MREGEN*dt;if(G.p.mana>G.p.mmana)G.p.mana=G.p.mmana;
+  G.p.mana+=MREGEN*(G.manaflood&&G.manaflood.phase==='boost'?5:G.manaflood&&G.manaflood.phase==='block'?0:1)*dt;
+  if(G.p.mana>G.p.mmana)G.p.mana=G.p.mmana;
   if(gameMode==='multi'){
     if(multiRole==='host'){
       G.a.mana+=MREGEN*dt;if(G.a.mana>G.a.mmana)G.a.mana=G.a.mmana;
@@ -2179,6 +2592,8 @@ function loop(ts){
     updBossCrystal(dt);
     updPotions(dt);
     checkFusion();
+    if(G.fusionCD>0)G.fusionCD-=dt;
+    updSkillBar(dt);
   }
   var npt=[];for(i=0;i<G.parts.length;i++){var pp=G.parts[i];pp.x+=pp.vx*dt;pp.y+=pp.vy*dt;pp.vy+=50*dt;pp.life-=dt;if(pp.life>0)npt.push(pp);}G.parts=npt;
   var nd=[];for(i=0;i<G.dmgs.length;i++){var dd=G.dmgs[i];dd.y+=dd.vy*dt;dd.life-=dt;if(dd.life>0)nd.push(dd);}G.dmgs=nd;
